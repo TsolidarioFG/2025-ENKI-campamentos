@@ -4,10 +4,556 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
 }
+
+enum UserRole {
+  ADMIN
+  SUPERADMIN
+}
+
+enum PaymentMode {
+  ONE_PAYMENT
+  TWO_PAYMENTS
+}
+
+enum PaymentType {
+  FULL
+  FIRST_INSTALLMENT
+  SECOND_INSTALLMENT
+  EXTRA
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CARD
+  BIZUM
+  OTHER
+}
+
+enum InscriptionStatus {
+  PENDING
+  PARTIALLY_ACCEPTED
+  ACCEPTED
+  WAITLIST
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum WeekInscriptionStatus {
+  PENDING
+  ACCEPTED
+  WAITLIST
+  REJECTED
+  CANCELLED
+}
+enum SchoolingType {
+  ORDINARY
+  SPECIAL
+  OTHER
+}
+
+enum SwimmingLevel {
+  YES
+  NO
+  WITH_TECHNICAL_AIDS
+  WITH_SUPPORT
+}
+
+enum SupportType {
+  NONE
+  INTERMITTENT
+  LIMITED_EXTENSIVE
+  GENERALIZED_CONSTANT
+}
+
+enum HygieneLevel {
+  INDEPENDENT
+  NEEDS_SUPERVISION
+  NEEDS_PHYSICAL_SUPPORT
+}
+
+enum SphincterControlLevel {
+  GOES_ALONE
+  ASKS_OR_WARNS
+  MUST_BE_ASKED
+  USES_DIAPER
+}
+
+enum EatingSupportLevel {
+  INDEPENDENT
+  NEEDS_SUPERVISION
+  NEEDS_INTERMITTENT_SUPPORT
+  NEEDS_CONTINUOUS_SUPPORT
+}
+
+enum OralLanguageLevel {
+  SOUNDS
+  SOME_WORDS
+  PHRASES
+  FLUENT
+  DOES_NOT_SPEAK
+}
+
+enum ImitationLevel {
+  IMITATES_GESTURES
+  IMITATES_COMPLEX_ACTIONS
+  IMITATES_SOUNDS
+  IMITATES_WORDS
+  DOES_NOT_IMITATE
+}
+
+enum AlternativeCommunicationType {
+  NONE
+  SIGN_LANGUAGE
+  PECS
+  COMMUNICATOR
+  BRAILLE
+  OTHER
+}
+
+enum ComprehensionLevel {
+  UNDERSTANDS_NO_ONLY
+  UNDERSTANDS_SIMPLE_COMMANDS
+  UNDERSTANDS_COMPLEX_COMMANDS
+  NO_COMPREHENSION
+  OTHER
+}
+
+enum ReadingLevel {
+  LETTERS
+  NUMBERS
+  WORDS
+  SENTENCES
+  TEXTS
+  DOES_NOT_READ
+  OTHER
+}
+
+enum WritingLevel {
+  LETTERS
+  NUMBERS
+  WORDS
+  SENTENCES
+  TEXTS
+}
+
+enum MobilityLevel {
+  INDEPENDENT
+  NEEDS_SUPERVISION
+  NEEDS_PHYSICAL_SUPPORT_OR_AID
+}
+
+enum SocialPlayLevel {
+  NO_INTEREST_IN_GROUP_PLAY
+  SMALL_GROUPS
+  LARGE_GROUPS
+}
+
+enum PlayDurationLevel {
+  SHORT_TIME
+  LONG_TIME
+}
+
+enum FoodSensitivityType {
+  SOLIDS
+  PUREES
+  SOUPS
+  WATER_JUICES
+  YOGURTS
+  FRUIT
+  NONE
+  OTHER
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(ADMIN)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SummerCamp {
+  id                    Int      @id @default(autoincrement())
+  name                  String
+  place                 String
+  year                  Int
+  description           String?
+  startDate             DateTime?
+  endDate               DateTime?
+  inscriptionOpenDate   DateTime?
+  inscriptionCloseDate  DateTime?
+  formEnabled           Boolean  @default(true)
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  weeks                 Week[]
+  importantDates        ImportantDate[]
+}
+
+model ImportantDate {
+  id            Int      @id @default(autoincrement())
+  title         String
+  description   String?
+  date          DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  summerCampId  Int
+  summerCamp    SummerCamp @relation(fields: [summerCampId], references: [id])
+}
+
+model Week {
+  id                        Int      @id @default(autoincrement())
+  number                    Int
+  startDate                 DateTime?
+  endDate                   DateTime?
+  totalPlaces               Int
+  availablePlaces           Int
+  totalDisabilityPlaces     Int
+  availableDisabilityPlaces Int
+  active                    Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  summerCampId              Int
+  summerCamp                SummerCamp @relation(fields: [summerCampId], references: [id])
+
+  prices                    Price[]
+  signedUpWeeks             SignedUp[]
+
+  @@unique([summerCampId, number])
+}
+
+model Price {
+  id                Int      @id @default(autoincrement())
+  basePrice         Float
+  disabilityPrice   Float
+  earlyRisePrice    Float
+  breakfastPrice    Float
+  lunchPrice        Float
+  isActive          Boolean  @default(true)
+  validFrom         DateTime?
+  validTo           DateTime?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  weekId            Int
+  week              Week @relation(fields: [weekId], references: [id])
+}
+
+model Participant {
+  id                   Int      @id @default(autoincrement())
+  name                 String
+  surname              String
+  birthdate            DateTime
+  gender               String?
+  healthCard           String?
+  repeatedBefore       Boolean  @default(false)
+  siblings             Boolean  @default(false)
+  schoolRelated        Boolean?
+  schoolObservations   String?
+  hasDisability        Boolean  @default(false)
+  notes                String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  guardian             Guardian?
+  address              Address?
+  inscription          Inscription?
+  authorizedPeople     AuthorizedPerson[]
+  allergies            Allergy[]
+  medications          Medication[]
+  extraForm            ExtraForm?
+}
+
+model Guardian {
+  id             Int      @id @default(autoincrement())
+  name           String
+  surname        String
+  dni            String?
+  phone          String
+  phone2         String?
+  email          String
+  email2         String?
+  relation       String?
+  signaturePath  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  participantId  Int      @unique
+  participant    Participant @relation(fields: [participantId], references: [id])
+}
+
+model AuthorizedPerson {
+  id             Int      @id @default(autoincrement())
+  name           String
+  surname        String
+  dni            String?
+  phone          String?
+  relation       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  participantId  Int
+  participant    Participant @relation(fields: [participantId], references: [id])
+}
+
+model Address {
+  id             Int      @id @default(autoincrement())
+  street         String?
+  city           String?
+  province       String?
+  postalCode     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  participantId  Int      @unique
+  participant    Participant @relation(fields: [participantId], references: [id])
+}
+
+model Inscription {
+  id                    Int               @id @default(autoincrement())
+  inscriptionDate       DateTime          @default(now())
+  paymentMode           PaymentMode
+  globalStatus          InscriptionStatus @default(PENDING)
+
+  totalAmountExpected   Float             @default(0)
+  totalAmountPaid       Float             @default(0)
+  totalAmountPending    Float             @default(0)
+
+  invoiceRequested      Boolean           @default(false)
+  invoiceIssued         Boolean           @default(false)
+  invoiceName           String?
+  invoiceDni            String?
+
+  dataTreatmentAccepted Boolean           @default(false)
+  outingsAccepted       Boolean           @default(false)
+  imagesAccepted        Boolean           @default(false)
+
+  reservationExpiresAt  DateTime?
+  notes                 String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  submittedAt           DateTime?
+  participantId         Int               @unique
+  participant           Participant       @relation(fields: [participantId], references: [id])
+
+  payments              Payment[]
+  signedUpWeeks         SignedUp[]
+  appliedDiscounts      InscriptionDiscount[]
+}
+
+model Payment {
+  id               Int           @id @default(autoincrement())
+  paymentType      PaymentType
+  status           PaymentStatus @default(PENDING)
+  method           PaymentMethod?
+  amount           Float
+  concept          String?
+  dueDate          DateTime?
+  paidAt           DateTime?
+  receiptRequested Boolean @default(false)
+  receiptSent      Boolean @default(false)
+  receiptSentAt    DateTime?
+  isMandatory      Boolean       @default(true)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  inscriptionId    Int
+  inscription      Inscription   @relation(fields: [inscriptionId], references: [id])
+}
+
+model Discount {
+  id               Int      @id @default(autoincrement())
+  code             String   @unique
+  question         String
+  percentage       Float
+  isActive         Boolean  @default(true)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  appliedDiscounts InscriptionDiscount[]
+}
+
+model InscriptionDiscount {
+  inscriptionId    Int
+  discountId       Int
+  amountApplied    Float?
+  justification    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  inscription      Inscription @relation(fields: [inscriptionId], references: [id])
+  discount         Discount    @relation(fields: [discountId], references: [id])
+
+  @@id([inscriptionId, discountId])
+}
+
+model SignedUp {
+  inscriptionId    Int
+  weekId           Int
+
+  state            WeekInscriptionStatus @default(PENDING)
+  priceApplied     Float                 @default(0)
+  lunch            Boolean               @default(false)
+  breakfast        Boolean               @default(false)
+  earlyRise        Boolean               @default(false)
+  notes            String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  inscription      Inscription @relation(fields: [inscriptionId], references: [id])
+  week             Week        @relation(fields: [weekId], references: [id])
+
+  @@id([inscriptionId, weekId])
+}
+
+model Allergy {
+  id               Int      @id @default(autoincrement())
+  description      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  participantId    Int
+  participant      Participant @relation(fields: [participantId], references: [id])
+}
+
+model Medication {
+  id               Int      @id @default(autoincrement())
+  description      String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  participantId    Int
+  participant      Participant @relation(fields: [participantId], references: [id])
+}
+
+model ExtraForm {
+  id                    Int      @id @default(autoincrement())
+  
+  calledBefore          Boolean?
+  
+  routines              String?
+  emotionalRegulation   String?
+  schoolingType         SchoolingType?
+  schoolingTypeOther    String?
+  supportType           SupportType?
+  hygiene               HygieneLevel?
+  bladderControl        SphincterControlLevel?
+  bowelControl          SphincterControlLevel?
+  eatingSupport         EatingSupportLevel?
+  feedingAdaptation     String?
+  
+  chokingEpisodes       Boolean?
+  extraInfo             String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  participantId         Int      @unique
+  participant           Participant @relation(fields: [participantId], references: [id])
+
+  disability            Disability?
+  sports                Sport?
+  fears                 Fear?
+  communication         Communication?
+  foodSensitivities FoodSensitivity[]
+}
+
+model Disability {
+  id                    Int      @id @default(autoincrement())
+  functionalDiversity   String?
+  disabilityDegree      String?
+  dependencyDegree      String?
+  wheelchair            Boolean?
+  mobilityAid           String?
+  walking               MobilityLevel?
+  running               MobilityLevel?
+  climbing              MobilityLevel?
+  crawling              MobilityLevel?
+  jumping               MobilityLevel?
+  stairs                MobilityLevel?
+  outdoorMobility       MobilityLevel?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  extraFormId           Int      @unique
+  extraForm             ExtraForm @relation(fields: [extraFormId], references: [id])
+}
+
+model Sport {
+  id                    Int      @id @default(autoincrement())
+  doesSport             Boolean?
+  favoriteSports        String?
+  swimmingLevel         SwimmingLevel?
+  socialPlay            SocialPlayLevel?
+  playFixation          PlayDurationLevel?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  extraFormId           Int      @unique
+  extraForm             ExtraForm @relation(fields: [extraFormId], references: [id])
+}
+
+model Fear {
+  id                    Int      @id @default(autoincrement())
+  fears                 String?
+  copingMechanisms      String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  extraFormId           Int      @unique
+  extraForm             ExtraForm @relation(fields: [extraFormId], references: [id])
+}
+
+model Communication {
+  id                       Int      @id @default(autoincrement())
+  oralLanguage             OralLanguageLevel?
+  imitation                ImitationLevel?
+  writing                  WritingLevel?
+  comprehension            ComprehensionLevel?
+  reading                  ReadingLevel?
+  alternativeCommunicationOther String?
+  comprehensionOther            String?
+  readingOther                  String?
+  alternativeCommunication AlternativeCommunicationType?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  extraFormId              Int      @unique
+  extraForm                ExtraForm @relation(fields: [extraFormId], references: [id])
+}
+model FoodSensitivity {
+  id              Int                 @id @default(autoincrement())
+  type            FoodSensitivityType
+  otherText       String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  extraFormId     Int
+  extraForm       ExtraForm           @relation(fields: [extraFormId], references: [id])
+
+  @@unique([extraFormId, type])
+}
+
