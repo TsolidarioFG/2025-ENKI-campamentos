@@ -3,6 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import prisma from "./lib/prisma.js";
 import summerCampRoutes from "./routes/summerCamp.routes.js";
+import weekRoutes from "./routes/week.routes.js";
+import priceRoutes from "./routes/price.routes.js";
 
 dotenv.config();
 
@@ -29,6 +31,8 @@ app.get("/api/test-db", async (req, res) => {
 });
 
 app.use("/api/summercamps", summerCampRoutes);
+app.use("/api/weeks", weekRoutes);
+app.use("/api/prices", priceRoutes);
 
 const PORT = process.env.PORT || 3000;
 

@@ -1,14 +1,14 @@
 import express from "express";
 import {
   getPrices,
-  getPricesByWeek,
   createPrice,
+  updatePrice,
 } from "../controllers/price.controller.js";
 
 const router = express.Router();
 
 router.get("/", getPrices);
-router.get("/week/:weekId", getPricesByWeek);
 router.post("/", createPrice);
+router.patch("/", updatePrice);
 
 export default router;
