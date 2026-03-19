@@ -57,9 +57,17 @@ enum WeekInscriptionStatus {
   PENDING
   ACCEPTED
   WAITLIST
-  REJECTED
   CANCELLED
 }
+
+enum PaymentPurpose {
+  RESERVATION
+  BREAKFAST
+  LUNCH
+  EARLY_RISE
+  OTHER
+}
+
 enum SchoolingType {
   ORDINARY
   SPECIAL
@@ -381,8 +389,8 @@ model Payment {
   concept          String?
   dueDate          DateTime?
   paidAt           DateTime?
-  receiptRequested Boolean @default(false)
-  receiptSent      Boolean @default(false)
+  receiptRequested Boolean       @default(false)
+  receiptSent      Boolean       @default(false)
   receiptSentAt    DateTime?
   isMandatory      Boolean       @default(true)
   notes            String?
@@ -391,6 +399,8 @@ model Payment {
 
   inscriptionId    Int
   inscription      Inscription   @relation(fields: [inscriptionId], references: [id])
+
+  paymentAllocations PaymentSignedUp[]
 }
 
 model Discount {
@@ -436,7 +446,28 @@ model SignedUp {
   inscription      Inscription @relation(fields: [inscriptionId], references: [id])
   week             Week        @relation(fields: [weekId], references: [id])
 
+  paymentAllocations PaymentSignedUp[]
+
   @@id([inscriptionId, weekId])
+}
+
+model PaymentSignedUp {
+  id            Int            @id @default(autoincrement())
+  paymentId     Int
+  inscriptionId Int
+  weekId        Int
+  purpose       PaymentPurpose
+  amount        Float
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  payment       Payment        @relation(fields: [paymentId], references: [id])
+  signedUp      SignedUp       @relation(fields: [inscriptionId, weekId], references: [inscriptionId, weekId])
+
+  @@unique([paymentId, inscriptionId, weekId, purpose])
+  @@index([paymentId])
+  @@index([inscriptionId, weekId])
 }
 
 model Allergy {

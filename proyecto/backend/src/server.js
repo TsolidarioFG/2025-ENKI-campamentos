@@ -5,6 +5,9 @@ import prisma from "./lib/prisma.js";
 import summerCampRoutes from "./routes/summerCamp.routes.js";
 import weekRoutes from "./routes/week.routes.js";
 import priceRoutes from "./routes/price.routes.js";
+import inscriptionRoutes from "./routes/inscription.routes.js";
+import signedUpRoutes from "./routes/signedUp.routes.js";
+import paymentRoutes from "./routes/payments.routes.js";
 
 dotenv.config();
 
@@ -33,6 +36,9 @@ app.get("/api/test-db", async (req, res) => {
 app.use("/api/summercamps", summerCampRoutes);
 app.use("/api/weeks", weekRoutes);
 app.use("/api/prices", priceRoutes);
+app.use("/api/inscriptions", inscriptionRoutes);
+app.use("/api/signedup", signedUpRoutes);
+app.use("/api/payments", paymentRoutes);
 
 const PORT = process.env.PORT || 3000;
 
