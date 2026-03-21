@@ -11,7 +11,7 @@ const splitAmountInTwo = (amount) => {
   return [first, second];
 };
 
-const getGlobalInscriptionStatus = (states) => {
+export const getGlobalInscriptionStatus = (states) => {
   if (states.length === 0) return "PENDING";
 
   const allAccepted = states.every((state) => state === "ACCEPTED");

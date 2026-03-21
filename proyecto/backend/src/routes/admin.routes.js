@@ -5,7 +5,7 @@ import {
   getPendingPayments,
   getDebtors,
 } from "../controllers/admin.controller.js";
-import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 router.use(requireAuth, requireRole("ADMIN", "SUPERADMIN"));

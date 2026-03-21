@@ -3,7 +3,7 @@ import {
   getAppSettings,
   updateAppSettings,
 } from "../controllers/appSettings.controller.js";
-import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 

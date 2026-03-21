@@ -4,8 +4,8 @@ import {
   getPaymentById,
   registerPayment,
   createExtraPayment,
-} from "../controllers/payment.controller.js";
-import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
+} from "../controllers/payments.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
