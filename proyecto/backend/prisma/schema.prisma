@@ -12,6 +12,7 @@ datasource db {
 }
 
 enum UserRole {
+  USER
   ADMIN
   SUPERADMIN
 }
@@ -185,6 +186,13 @@ enum FoodSensitivityType {
   FRUIT
   NONE
   OTHER
+}
+
+model AppSettings {
+  id                      Int      @id
+  pendingReservationHours Int      @default(48)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }
 
 model User {

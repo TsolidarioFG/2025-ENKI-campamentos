@@ -848,3 +848,155 @@ export const createInscription = async (req, res) => {
     });
   }
 };
+
+export const cancelInscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const parsedId = Number(id);
+
+    if (!Number.isInteger(parsedId) || parsedId <= 0) {
+      return res.status(400).json({
+        error: "id debe ser un número entero mayor que 0",
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const inscription = await tx.inscription.findUnique({
+        where: { id: parsedId },
+        include: {
+          participant: true,
+          signedUpWeeks: {
+            include: {
+              week: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+          payments: true,
+        },
+      });
+
+      if (!inscription) {
+        throw new Error("La inscripción no existe");
+      }
+
+      if (inscription.globalStatus === "CANCELLED") {
+        throw new Error("La inscripción ya está cancelada");
+      }
+
+      const hasDisability = inscription.participant.hasDisability === true;
+
+      for (const signedUp of inscription.signedUpWeeks) {
+        if (signedUp.state === "CANCELLED") {
+          continue;
+        }
+
+        if (signedUp.state === "WAITLIST") {
+          await tx.signedUp.update({
+            where: {
+              inscriptionId_weekId: {
+                inscriptionId: signedUp.inscriptionId,
+                weekId: signedUp.weekId,
+              },
+            },
+            data: {
+              state: "CANCELLED",
+            },
+          });
+
+          continue;
+        }
+
+        if (signedUp.state === "PENDING" || signedUp.state === "ACCEPTED") {
+          const waitlistCount = await tx.signedUp.count({
+            where: {
+              weekId: signedUp.weekId,
+              state: "WAITLIST",
+              inscriptionId: {
+                not: parsedId,
+              },
+            },
+          });
+
+          if (waitlistCount === 0) {
+            if (hasDisability) {
+              await tx.week.update({
+                where: { id: signedUp.weekId },
+                data: {
+                  availableDisabilityPlaces:
+                    signedUp.week.availableDisabilityPlaces + 1,
+                },
+              });
+            } else {
+              await tx.week.update({
+                where: { id: signedUp.weekId },
+                data: {
+                  availablePlaces: signedUp.week.availablePlaces + 1,
+                },
+              });
+            }
+          }
+
+          await tx.signedUp.update({
+            where: {
+              inscriptionId_weekId: {
+                inscriptionId: signedUp.inscriptionId,
+                weekId: signedUp.weekId,
+              },
+            },
+            data: {
+              state: "CANCELLED",
+            },
+          });
+        }
+      }
+
+      await tx.inscription.update({
+        where: { id: parsedId },
+        data: {
+          globalStatus: "CANCELLED",
+        },
+      });
+
+      return tx.inscription.findUnique({
+        where: { id: parsedId },
+        include: {
+          participant: true,
+          signedUpWeeks: {
+            include: {
+              week: true,
+              paymentAllocations: {
+                include: {
+                  payment: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+          payments: {
+            include: {
+              paymentAllocations: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
+    });
+
+    res.json({
+      message: "Inscripción cancelada correctamente",
+      inscription: result,
+    });
+  } catch (error) {
+    console.error("Error al cancelar la inscripción:", error);
+    res.status(500).json({
+      error: error.message || "Error al cancelar la inscripción",
+    });
+  }
+};

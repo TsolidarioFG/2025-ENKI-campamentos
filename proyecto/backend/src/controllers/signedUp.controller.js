@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js";
+import { cancelExpiredPendingSignedUpsLogic } from "../services/cron.service.js";
 
 const isNonEmptyString = (value) => {
   return typeof value === "string" && value.trim() !== "";
@@ -105,6 +106,8 @@ const createReservationPaymentsForSingleSignedUp = async ({
     });
   }
 };
+
+const validSignedUpStates = ["PENDING", "WAITLIST", "ACCEPTED", "CANCELLED"];
 
 export const updateSignedUpStatus = async (req, res) => {
   try {
@@ -369,6 +372,187 @@ export const updateSignedUpStatus = async (req, res) => {
     console.error("Error al actualizar el estado de la reserva:", error);
     res.status(500).json({
       error: error.message || "Error al actualizar el estado de la reserva",
+    });
+  }
+};
+
+export const getSignedUpsByWeek = async (req, res) => {
+  try {
+    const { weekId } = req.params;
+    const {
+      breakfast,
+      lunch,
+      earlyRise,
+      hasDisability,
+      accepted,
+      waitlist,
+    } = req.query;
+
+    const parsedWeekId = Number(weekId);
+
+    if (!Number.isInteger(parsedWeekId) || parsedWeekId <= 0) {
+      return res.status(400).json({
+        error: "weekId inválido",
+      });
+    }
+
+    const signedUps = await prisma.signedUp.findMany({
+      where: {
+        weekId: parsedWeekId,
+      },
+      include: {
+        inscription: {
+          include: {
+            participant: true,
+            guardian: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    const filtered = signedUps.filter((s) => {
+      if (
+        breakfast !== undefined &&
+        String(s.breakfast) !== breakfast
+      )
+        return false;
+
+      if (lunch !== undefined && String(s.lunch) !== lunch)
+        return false;
+
+      if (
+        earlyRise !== undefined &&
+        String(s.earlyRise) !== earlyRise
+      )
+        return false;
+
+      if (
+        hasDisability !== undefined &&
+        String(s.inscription.participant.hasDisability) !==
+          hasDisability
+      )
+        return false;
+
+      if (
+        accepted === "true" &&
+        s.state !== "ACCEPTED"
+      )
+        return false;
+
+      if (
+        waitlist === "true" &&
+        s.state !== "WAITLIST"
+      )
+        return false;
+
+      return true;
+    });
+
+    res.json(filtered);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error signedups week" });
+  }
+};
+
+export const getWeekWaitlist = async (req, res) => {
+  try {
+    const { weekId } = req.params;
+
+    const parsedWeekId = Number(weekId);
+
+    if (!Number.isInteger(parsedWeekId) || parsedWeekId <= 0) {
+      return res.status(400).json({
+        error: "weekId debe ser un número entero mayor que 0",
+      });
+    }
+
+    const week = await prisma.week.findUnique({
+      where: { id: parsedWeekId },
+      include: {
+        summerCamp: true,
+      },
+    });
+
+    if (!week) {
+      return res.status(404).json({
+        error: "La semana no existe",
+      });
+    }
+
+    const waitlist = await prisma.signedUp.findMany({
+      where: {
+        weekId: parsedWeekId,
+        state: "WAITLIST",
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+      include: {
+        inscription: {
+          include: {
+            participant: {
+              include: {
+                guardian: true,
+                address: true,
+              },
+            },
+          },
+        },
+        week: {
+          include: {
+            summerCamp: true,
+          },
+        },
+        paymentAllocations: {
+          include: {
+            payment: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+      },
+    });
+
+    const formattedWaitlist = waitlist.map((item, index) => ({
+      waitlistPosition: index + 1,
+      ...item,
+    }));
+
+    res.json({
+      week: {
+        id: week.id,
+        number: week.number,
+        summerCampId: week.summerCampId,
+        summerCampName: week.summerCamp?.name || null,
+      },
+      totalWaitlist: formattedWaitlist.length,
+      waitlist: formattedWaitlist,
+    });
+  } catch (error) {
+    console.error("Error al obtener la lista de espera:", error);
+    res.status(500).json({
+      error: "Error al obtener la lista de espera",
+    });
+  }
+};
+
+export const cancelExpiredPendingSignedUps = async (req, res) => {
+  try {
+    const result = await cancelExpiredPendingSignedUpsLogic();
+
+    res.json({
+      message: "Revisión completada",
+      ...result,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "Error al cancelar reservas caducadas",
     });
   }
 };

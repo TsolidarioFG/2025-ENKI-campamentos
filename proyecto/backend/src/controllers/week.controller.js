@@ -392,7 +392,7 @@ export const updateWeek = async (req, res) => {
       });
     }
 
-    // NUEVAS COMPROBACIONES DE COHERENCIA CON PLAZAS YA OCUPADAS
+    
     const occupiedPlaces = existingWeek.totalPlaces - existingWeek.availablePlaces;
     const occupiedDisabilityPlaces =
       existingWeek.totalDisabilityPlaces - existingWeek.availableDisabilityPlaces;
