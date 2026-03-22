@@ -320,13 +320,8 @@ export const updateSignedUpStatus = async (req, res) => {
       });
 
       const newGlobalStatus = getGlobalInscriptionStatus(
-        updatedSignedUps.map((item) =>
-          item.inscriptionId === parsedInscriptionId &&
-          item.weekId === parsedWeekId
-            ? newState
-            : item.state
-        )
-      );
+        updatedSignedUps.map((item) => item.state)
+      );    
 
       await tx.inscription.update({
         where: { id: parsedInscriptionId },
@@ -380,6 +375,7 @@ export const getSignedUpsByWeek = async (req, res) => {
   try {
     const { weekId } = req.params;
     const {
+      state,
       breakfast,
       lunch,
       earlyRise,
@@ -396,6 +392,14 @@ export const getSignedUpsByWeek = async (req, res) => {
       });
     }
 
+    const validStates = ["PENDING", "WAITLIST", "ACCEPTED", "CANCELLED"];
+
+    if (state !== undefined && !validStates.includes(state)) {
+      return res.status(400).json({
+        error: "state debe ser PENDING, WAITLIST, ACCEPTED o CANCELLED",
+      });
+    }
+
     const signedUps = await prisma.signedUp.findMany({
       where: {
         weekId: parsedWeekId,
@@ -403,8 +407,11 @@ export const getSignedUpsByWeek = async (req, res) => {
       include: {
         inscription: {
           include: {
-            participant: true,
-            guardian: true,
+            participant: {
+              include: {
+                guardian: true,
+              },
+            },
           },
         },
       },
@@ -414,39 +421,36 @@ export const getSignedUpsByWeek = async (req, res) => {
     });
 
     const filtered = signedUps.filter((s) => {
-      if (
-        breakfast !== undefined &&
-        String(s.breakfast) !== breakfast
-      )
+      if (state !== undefined && s.state !== state) {
         return false;
+      }
 
-      if (lunch !== undefined && String(s.lunch) !== lunch)
+      if (breakfast !== undefined && String(s.breakfast) !== breakfast) {
         return false;
+      }
 
-      if (
-        earlyRise !== undefined &&
-        String(s.earlyRise) !== earlyRise
-      )
+      if (lunch !== undefined && String(s.lunch) !== lunch) {
         return false;
+      }
+
+      if (earlyRise !== undefined && String(s.earlyRise) !== earlyRise) {
+        return false;
+      }
 
       if (
         hasDisability !== undefined &&
-        String(s.inscription.participant.hasDisability) !==
-          hasDisability
-      )
+        String(s.inscription.participant.hasDisability) !== hasDisability
+      ) {
         return false;
+      }
 
-      if (
-        accepted === "true" &&
-        s.state !== "ACCEPTED"
-      )
+      if (accepted === "true" && s.state !== "ACCEPTED") {
         return false;
+      }
 
-      if (
-        waitlist === "true" &&
-        s.state !== "WAITLIST"
-      )
+      if (waitlist === "true" && s.state !== "WAITLIST") {
         return false;
+      }
 
       return true;
     });

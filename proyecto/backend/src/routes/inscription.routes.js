@@ -1,17 +1,21 @@
 import express from "express";
 import {
-  getPayments,
-  getPaymentById,
-  registerPayment,
-  createExtraPayment,
-} from "../controllers/payments.controller.js";
+  createInscription,
+  getInscriptions,
+  getInscriptionById,
+  cancelInscription,
+} from "../controllers/inscription.controller.js";
 import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.get("/", requireAuth, requireRole("ADMIN", "SUPERADMIN"), getPayments);
-router.get("/:id", requireAuth, requireRole("ADMIN", "SUPERADMIN"), getPaymentById);
-router.post("/extra", requireAuth, requireRole("ADMIN", "SUPERADMIN"), createExtraPayment);
-router.patch("/:id/pay", requireAuth, requireRole("ADMIN", "SUPERADMIN"), registerPayment);
+
+router.post("/", createInscription);
+
+router.get("/", requireAuth, requireRole("USER", "ADMIN", "SUPERADMIN"), getInscriptions);
+router.get("/:id", requireAuth, requireRole("USER", "ADMIN", "SUPERADMIN"), getInscriptionById);
+
+
+router.patch("/:id/cancel", requireAuth, requireRole("ADMIN", "SUPERADMIN"), cancelInscription);
 
 export default router;

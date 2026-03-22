@@ -89,8 +89,11 @@ export const getInscriptionsTable = async (req, res) => {
 
     const inscriptions = await prisma.inscription.findMany({
       include: {
-        participant: true,
-        guardian: true,
+        participant: {
+          include: {
+            guardian: true,
+          },
+        },
         payments: true,
         signedUpWeeks: {
           include: {
@@ -113,10 +116,10 @@ export const getInscriptionsTable = async (req, res) => {
         id: i.id,
         participantName: i.participant.name,
         participantSurname: i.participant.surname,
-        guardianName: i.guardian.name,
-        guardianSurname: i.guardian.surname,
-        phone: i.guardian.phone,
-        email: i.guardian.email,
+        guardianName: i.participant.guardian?.name || null,
+        guardianSurname: i.participant.guardian?.surname || null,
+        phone: i.participant.guardian?.phone || null,
+        email: i.participant.guardian?.email || null,
         totalPaid: i.totalAmountPaid,
         totalPending: i.totalAmountPending,
         accepted: hasAccepted,
@@ -173,9 +176,17 @@ export const getDebtors = async (req, res) => {
         },
       },
       include: {
-        participant: true,
-        guardian: true,
+        participant: {
+          include: {
+            guardian: true,
+          },
+        },
         payments: true,
+        signedUpWeeks: {
+          include: {
+            week: true,
+          },
+        },
       },
     });
 
