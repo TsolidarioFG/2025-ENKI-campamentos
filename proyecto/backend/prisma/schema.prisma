@@ -427,8 +427,6 @@ model Discount {
 model InscriptionDiscount {
   inscriptionId    Int
   discountId       Int
-  amountApplied    Float?
-  justification    String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -523,9 +521,9 @@ model ExtraForm {
   participant           Participant @relation(fields: [participantId], references: [id])
 
   disability            Disability?
-  sports                Sport?
-  fears                 Fear?
-  communication         Communication?
+  sports                Sport[]
+  fears                 Fear[]
+  communication         Communication[]
   foodSensitivities FoodSensitivity[]
 }
 
@@ -560,7 +558,7 @@ model Sport {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  extraFormId           Int      @unique
+  extraFormId           Int      
   extraForm             ExtraForm @relation(fields: [extraFormId], references: [id])
 }
 
@@ -571,7 +569,7 @@ model Fear {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  extraFormId           Int      @unique
+  extraFormId           Int      
   extraForm             ExtraForm @relation(fields: [extraFormId], references: [id])
 }
 
@@ -589,7 +587,7 @@ model Communication {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  extraFormId              Int      @unique
+  extraFormId              Int      
   extraForm                ExtraForm @relation(fields: [extraFormId], references: [id])
 }
 model FoodSensitivity {

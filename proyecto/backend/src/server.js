@@ -12,8 +12,10 @@ import appSettingsRoutes from "./routes/appSettings.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import discountRoutes from "./routes/discount.routes.js";
 import { startCronJobs } from "./services/cron.service.js";
-
+import { createDefaultDiscounts } from "./services/discount.creation.js";
+import extraFormRoutes from "./routes/extraform.routes.js";
 dotenv.config();
 
 const app = express();
@@ -48,10 +50,22 @@ app.use("/api/settings", appSettingsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/discounts", discountRoutes);
+app.use("/api/extraForm", extraFormRoutes);
 
 const PORT = process.env.PORT || 3000;
+const startServer = async () => {
+  try {
+    await createDefaultDiscounts();
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  startCronJobs();
-});
+    app.listen(PORT, () => {
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
+      startCronJobs();
+    });
+  } catch (error) {
+    console.error("Error al iniciar la aplicación:", error);
+    process.exit(1);
+  }
+};
+
+startServer();

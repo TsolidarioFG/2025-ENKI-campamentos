@@ -1,4 +1,19 @@
 import prisma from "../lib/prisma.js";
+import {
+  normalizeText,
+  normalizeEmail,
+  isValidPhone,
+  isValidEmail,
+  isValidHealthCard,
+  isValidDniNie,
+  isValidPostalCode,
+} from "../utils/validators.js";
+import {
+  extractManualDiscountRequests,
+  resolveApplicableDiscountsForCreation,
+  createInscriptionDiscountRows,
+  applyDiscountsToAmount,
+} from "../services/discount.service.js";
 
 const isNonEmptyString = (value) => {
   return typeof value === "string" && value.trim() !== "";
@@ -40,24 +55,6 @@ const splitAmountInTwo = (amount) => {
   const first = Number((amount / 2).toFixed(2));
   const second = Number((amount - first).toFixed(2));
   return [first, second];
-};
-
-const getGlobalInscriptionStatus = (states) => {
-  if (states.length === 0) return "PENDING";
-
-  const allAccepted = states.every((state) => state === "ACCEPTED");
-  const allPending = states.every((state) => state === "PENDING");
-  const allWaitlist = states.every((state) => state === "WAITLIST");
-  const allCancelled = states.every((state) => state === "CANCELLED");
-
-  if (allAccepted) return "ACCEPTED";
-  if (allPending) return "PENDING";
-  if (allWaitlist) return "WAITLIST";
-  if (allCancelled) return "CANCELLED";
-
-  if (states.includes("PENDING")) return "PENDING";
-
-  return "PARTIALLY_ACCEPTED";
 };
 
 const createReservationPaymentsForSignedUps = async ({
@@ -345,27 +342,28 @@ export const createInscription = async (req, res) => {
       authorizedPeople,
       inscription,
       weeks,
+      discounts = [],
     } = req.body;
 
-    if (!participant || typeof participant !== "object") {
+    if (!participant || typeof participant !== "object" || Array.isArray(participant)) {
       return res.status(400).json({
         error: "participant es obligatorio y debe ser un objeto",
       });
     }
 
-    if (!guardian || typeof guardian !== "object") {
+    if (!guardian || typeof guardian !== "object" || Array.isArray(guardian)) {
       return res.status(400).json({
         error: "guardian es obligatorio y debe ser un objeto",
       });
     }
 
-    if (!address || typeof address !== "object") {
+    if (!address || typeof address !== "object" || Array.isArray(address)) {
       return res.status(400).json({
         error: "address es obligatorio y debe ser un objeto",
       });
     }
 
-    if (!inscription || typeof inscription !== "object") {
+    if (!inscription || typeof inscription !== "object" || Array.isArray(inscription)) {
       return res.status(400).json({
         error: "inscription es obligatorio y debe ser un objeto",
       });
@@ -382,6 +380,42 @@ export const createInscription = async (req, res) => {
         error: "weeks debe ser un array con al menos una semana",
       });
     }
+
+    if (!Array.isArray(discounts)) {
+      return res.status(400).json({
+        error: "discounts debe ser un array",
+      });
+    }
+
+    participant.name = normalizeText(participant.name);
+    participant.surname = normalizeText(participant.surname);
+    participant.gender = normalizeText(participant.gender);
+    participant.healthCard = participant.healthCard
+      ? normalizeText(String(participant.healthCard)).toUpperCase()
+      : participant.healthCard;
+    participant.schoolObservations = normalizeText(participant.schoolObservations);
+    participant.notes = normalizeText(participant.notes);
+
+    guardian.name = normalizeText(guardian.name);
+    guardian.surname = normalizeText(guardian.surname);
+    guardian.dni = guardian.dni ? normalizeText(guardian.dni).toUpperCase() : guardian.dni;
+    guardian.phone = guardian.phone ? String(guardian.phone).trim() : guardian.phone;
+    guardian.phone2 = guardian.phone2 ? String(guardian.phone2).trim() : guardian.phone2;
+    guardian.email = normalizeEmail(guardian.email);
+    guardian.email2 = guardian.email2 ? normalizeEmail(guardian.email2) : guardian.email2;
+    guardian.relation = normalizeText(guardian.relation);
+
+    address.street = normalizeText(address.street);
+    address.city = normalizeText(address.city);
+    address.province = normalizeText(address.province);
+    address.postalCode = address.postalCode ? String(address.postalCode).trim() : address.postalCode;
+
+    inscription.paymentMode = normalizeText(inscription.paymentMode);
+    inscription.invoiceName = normalizeText(inscription.invoiceName);
+    inscription.invoiceDni = inscription.invoiceDni
+      ? normalizeText(inscription.invoiceDni).toUpperCase()
+      : inscription.invoiceDni;
+    inscription.notes = normalizeText(inscription.notes);
 
     if (!isNonEmptyString(participant.name)) {
       return res.status(400).json({
@@ -437,6 +471,12 @@ export const createInscription = async (req, res) => {
       });
     }
 
+    if (participant.healthCard && !isValidHealthCard(participant.healthCard)) {
+      return res.status(400).json({
+        error: "participant.healthCard tiene un formato inválido",
+      });
+    }
+
     if (!isNonEmptyString(guardian.name)) {
       return res.status(400).json({
         error: "guardian.name es obligatorio",
@@ -455,9 +495,39 @@ export const createInscription = async (req, res) => {
       });
     }
 
+    if (!isValidPhone(guardian.phone)) {
+      return res.status(400).json({
+        error: "guardian.phone tiene un formato inválido",
+      });
+    }
+
+    if (guardian.phone2 && !isValidPhone(guardian.phone2)) {
+      return res.status(400).json({
+        error: "guardian.phone2 tiene un formato inválido",
+      });
+    }
+
     if (!isNonEmptyString(guardian.email)) {
       return res.status(400).json({
         error: "guardian.email es obligatorio",
+      });
+    }
+
+    if (!isValidEmail(guardian.email)) {
+      return res.status(400).json({
+        error: "guardian.email tiene un formato inválido",
+      });
+    }
+
+    if (guardian.email2 && !isValidEmail(guardian.email2)) {
+      return res.status(400).json({
+        error: "guardian.email2 tiene un formato inválido",
+      });
+    }
+
+    if (guardian.dni && !isValidDniNie(guardian.dni)) {
+      return res.status(400).json({
+        error: "guardian.dni tiene un formato inválido o letra incorrecta",
       });
     }
 
@@ -473,22 +543,48 @@ export const createInscription = async (req, res) => {
       });
     }
 
-    for (const person of authorizedPeople) {
-      if (!person || typeof person !== "object") {
+    if (address.postalCode && !isValidPostalCode(address.postalCode)) {
+      return res.status(400).json({
+        error: "address.postalCode tiene un formato inválido",
+      });
+    }
+
+    for (let i = 0; i < authorizedPeople.length; i++) {
+      const person = authorizedPeople[i];
+
+      if (!person || typeof person !== "object" || Array.isArray(person)) {
         return res.status(400).json({
-          error: "Cada persona autorizada debe ser un objeto válido",
+          error: `authorizedPeople[${i}] debe ser un objeto válido`,
         });
       }
 
+      person.name = normalizeText(person.name);
+      person.surname = normalizeText(person.surname);
+      person.dni = person.dni ? normalizeText(person.dni).toUpperCase() : person.dni;
+      person.phone = person.phone ? String(person.phone).trim() : person.phone;
+      person.relation = normalizeText(person.relation);
+
       if (!isNonEmptyString(person.name)) {
         return res.status(400).json({
-          error: "authorizedPerson.name es obligatorio",
+          error: `authorizedPeople[${i}].name es obligatorio`,
         });
       }
 
       if (!isNonEmptyString(person.surname)) {
         return res.status(400).json({
-          error: "authorizedPerson.surname es obligatorio",
+          error: `authorizedPeople[${i}].surname es obligatorio`,
+        });
+      }
+
+      if (person.phone && !isValidPhone(person.phone)) {
+        return res.status(400).json({
+          error: `authorizedPeople[${i}].phone tiene un formato inválido`,
+        });
+      }
+
+      if (person.dni && !isValidDniNie(person.dni)) {
+        return res.status(400).json({
+          error: `authorizedPeople[${i}].dni tiene un formato inválido o letra incorrecta`,
         });
       }
     }
@@ -536,10 +632,24 @@ export const createInscription = async (req, res) => {
       });
     }
 
+    if (inscription.invoiceRequested === true) {
+      if (!isNonEmptyString(inscription.invoiceName)) {
+        return res.status(400).json({
+          error: "inscription.invoiceName es obligatorio si se solicita factura",
+        });
+      }
+
+      if (inscription.invoiceDni && !isValidDniNie(inscription.invoiceDni)) {
+        return res.status(400).json({
+          error: "inscription.invoiceDni tiene un formato inválido o letra incorrecta",
+        });
+      }
+    }
+
     const seenWeeks = new Set();
 
     for (const week of weeks) {
-      if (!week || typeof week !== "object") {
+      if (!week || typeof week !== "object" || Array.isArray(week)) {
         return res.status(400).json({
           error: "Cada elemento de weeks debe ser un objeto válido",
         });
@@ -584,6 +694,7 @@ export const createInscription = async (req, res) => {
       }
     }
 
+    const manualDiscountRequests = extractManualDiscountRequests({ discounts });
     const hasDisability = participant.hasDisability === true;
     const now = new Date();
 
@@ -664,7 +775,7 @@ export const createInscription = async (req, res) => {
           healthCard: participant.healthCard || null,
           repeatedBefore: participant.repeatedBefore ?? false,
           siblings: participant.siblings ?? false,
-          schoolRelated: participant.schoolRelated ?? null,
+          schoolRelated: participant.schoolRelated ?? false,
           schoolObservations: participant.schoolObservations || null,
           hasDisability: participant.hasDisability ?? false,
           notes: participant.notes || null,
@@ -708,6 +819,12 @@ export const createInscription = async (req, res) => {
         });
       }
 
+      const applicableDiscounts = await resolveApplicableDiscountsForCreation(
+        tx,
+        participant,
+        manualDiscountRequests
+      );
+
       const weekStates = [];
       const signedUpRows = [];
       let totalAmountExpected = 0;
@@ -715,26 +832,35 @@ export const createInscription = async (req, res) => {
       for (const item of validatedWeeks) {
         const { selectedWeek, week, activePrice } = item;
 
-        let priceApplied = hasDisability
+        let grossAmount = hasDisability
           ? activePrice.disabilityPrice
           : activePrice.basePrice;
 
         if (selectedWeek.breakfast === true) {
-          priceApplied += activePrice.breakfastPrice;
+          grossAmount += activePrice.breakfastPrice;
         }
 
         if (selectedWeek.lunch === true) {
-          priceApplied += activePrice.lunchPrice;
+          grossAmount += activePrice.lunchPrice;
         }
 
         if (selectedWeek.earlyRise === true) {
-          priceApplied += activePrice.earlyRisePrice;
+          grossAmount += activePrice.earlyRisePrice;
         }
 
         const state = getInitialWeekState({ hasDisability, week });
         weekStates.push(state);
 
+        let finalAmount = grossAmount;
+
         if (state === "PENDING") {
+          const discountResult = applyDiscountsToAmount(
+            grossAmount,
+            applicableDiscounts
+          );
+
+          finalAmount = discountResult.finalAmount;
+
           if (hasDisability) {
             await tx.week.update({
               where: { id: week.id },
@@ -751,13 +877,13 @@ export const createInscription = async (req, res) => {
             });
           }
 
-          totalAmountExpected += priceApplied;
+          totalAmountExpected += finalAmount;
         }
 
         signedUpRows.push({
           weekId: week.id,
           state,
-          priceApplied,
+          priceApplied: finalAmount,
           breakfast: selectedWeek.breakfast ?? false,
           lunch: selectedWeek.lunch ?? false,
           earlyRise: selectedWeek.earlyRise ?? false,
@@ -783,6 +909,12 @@ export const createInscription = async (req, res) => {
           participantId: createdParticipant.id,
         },
       });
+
+      await createInscriptionDiscountRows(
+        tx,
+        createdInscription.id,
+        applicableDiscounts
+      );
 
       const createdSignedUps = [];
 
@@ -835,15 +967,33 @@ export const createInscription = async (req, res) => {
               createdAt: "asc",
             },
           },
-          appliedDiscounts: true,
+          appliedDiscounts: {
+            include: {
+              discount: true,
+            },
+          },
         },
       });
     });
 
-    res.status(201).json(result);
+    return res.status(201).json(result);
   } catch (error) {
     console.error("Error al crear inscripción:", error);
-    res.status(500).json({
+
+    if (
+      error.message?.includes("no existe") ||
+      error.message?.includes("está inactiva") ||
+      error.message?.includes("está inactivo") ||
+      error.message?.includes("aún no está abierto") ||
+      error.message?.includes("ya está cerrado") ||
+      error.message?.includes("no tiene precio activo")
+    ) {
+      return res.status(400).json({
+        error: error.message,
+      });
+    }
+
+    return res.status(500).json({
       error: error.message || "Error al crear inscripción",
     });
   }

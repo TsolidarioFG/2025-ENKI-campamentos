@@ -1,5 +1,8 @@
 import prisma from "../lib/prisma.js";
-
+import {
+  getApplicableDiscountsForInscription,
+  applyDiscountsToAmount,
+} from "../services/discount.service.js";
 const isNonEmptyString = (value) => {
   return typeof value === "string" && value.trim() !== "";
 };
@@ -248,12 +251,24 @@ export const createExtraPayment = async (req, res) => {
         );
       }
 
+      const applicableDiscounts = await getApplicableDiscountsForInscription(
+        tx,
+        parsedInscriptionId
+      );
+
+      const discountResult = applyDiscountsToAmount(
+        parsedAmount,
+        applicableDiscounts
+      );
+
+      const finalExtraAmount = discountResult.finalAmount;
+
       if (paymentMode === "ONE_PAYMENT") {
         const payment = await tx.payment.create({
           data: {
             paymentType: "EXTRA",
             status: "PENDING",
-            amount: parsedAmount,
+            amount: finalExtraAmount,
             concept:
               concept ||
               `Pago extra ${purpose} para semana ${signedUp.week.number}`,
@@ -271,14 +286,14 @@ export const createExtraPayment = async (req, res) => {
             inscriptionId: parsedInscriptionId,
             weekId: parsedWeekId,
             purpose,
-            amount: parsedAmount,
+            amount: finalExtraAmount,
             notes: notes || null,
           },
         });
       }
 
       if (paymentMode === "TWO_PAYMENTS") {
-        const [firstAmount, secondAmount] = splitAmountInTwo(parsedAmount);
+        const [firstAmount, secondAmount] = splitAmountInTwo(finalExtraAmount);
 
         const firstPayment = await tx.payment.create({
           data: {
@@ -338,8 +353,10 @@ export const createExtraPayment = async (req, res) => {
       const updatedInscription = await tx.inscription.update({
         where: { id: parsedInscriptionId },
         data: {
-          totalAmountExpected: signedUp.inscription.totalAmountExpected + parsedAmount,
-          totalAmountPending: signedUp.inscription.totalAmountPending + parsedAmount,
+          totalAmountExpected:
+            signedUp.inscription.totalAmountExpected + finalExtraAmount,
+          totalAmountPending:
+            signedUp.inscription.totalAmountPending + finalExtraAmount,
         },
       });
 
@@ -368,17 +385,22 @@ export const createExtraPayment = async (req, res) => {
               createdAt: "asc",
             },
           },
+          appliedDiscounts: {
+            include: {
+              discount: true,
+            },
+          },
         },
       });
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Pago extra creado correctamente",
       inscription: result,
     });
   } catch (error) {
     console.error("Error al crear el pago extra:", error);
-    res.status(500).json({
+    return res.status(500).json({
       error: error.message || "Error al crear el pago extra",
     });
   }
