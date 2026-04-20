@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
-import { normalizeText } from "../utils/validators.js";
+
+const SYSTEM_DISCOUNT_CODES = ["REPEAT", "SCHOOL", "SIBLING"];
 
 export const getDiscounts = async (req, res) => {
   try {
@@ -18,10 +19,9 @@ export const getDiscounts = async (req, res) => {
 };
 export const getDiscountById = async (req, res) => {
 try {
-    const {discountId} = req.params;
-    const parsedId = Number(discountId);
+    const {discountId} = req.validatedParams;
     const discount = await prisma.discount.findUnique({
-      where: {id: parsedId},
+      where: {id: discountId},
     });
     if (!discount) {
       return res.status(404).json({
@@ -39,22 +39,13 @@ try {
 }
 export const createDiscount = async (req, res) => {
 try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
     let {
       code, 
       question, 
       percentage, 
       isActive, 
       notes, 
-    } = req.body 
-
-    code = normalizeText(code)?.toUpperCase();
-    question = normalizeText(question);
-    notes = normalizeText(notes);
+    } = req.validatedBody 
 
     const discount = await prisma.discount.create({
       data:{
@@ -79,24 +70,14 @@ try {
 }
 export const updateDiscount = async (req, res) => {
 try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-    let { discountId } = req.params;
-    discountId = Number(discountId);
+    let { discountId } = req.validatedParams;
     let {
       code, 
       question, 
       percentage, 
       isActive, 
       notes, 
-    } = req.body;
-
-    code = code !== undefined ? normalizeText(code)?.toUpperCase() : undefined;
-    question = question !== undefined ? normalizeText(question) : undefined;
-    notes = notes !== undefined ? normalizeText(notes) : undefined;
+    } = req.validatedBody;
 
     const existingDiscount = await prisma.discount.findUnique({
       where: { id: discountId },
@@ -120,7 +101,7 @@ try {
       }
     }
     
-    if(["REPEAT","SCHOOL", "SIBLING"].includes(existingDiscount.code)){
+    if(SYSTEM_DISCOUNT_CODES.includes(existingDiscount.code)){
       if(isActive === false) return res.status(400).json({error: "No  se puede desactivar este descuento",});
       if(code !== undefined && code!=existingDiscount.code) return res.status(400).json({error: "No  se puede cambiar el código de este descuento",});
       if(question !== undefined && question!=existingDiscount.question) return res.status(400).json({error: "No  se puede cambiar la pregunta de este descuento",});
@@ -153,8 +134,7 @@ export const deleteDiscount = async (req, res) => {
 try {
     let {
       discountId
-    } = req.params;
-    discountId = Number(discountId)
+    } = req.validatedParams;
 
     const existingDiscount = await prisma.discount.findUnique({
       where: { id: discountId },
@@ -165,7 +145,7 @@ try {
         error: "Descuento no encontrado",
       });
     }
-    if(["REPEAT","SCHOOL", "SIBLING"].includes(existingDiscount.code)){
+    if(SYSTEM_DISCOUNT_CODES.includes(existingDiscount.code)){
        const updatedSystemDiscount = await prisma.discount.update({
         where: { id: discountId },
         data: {

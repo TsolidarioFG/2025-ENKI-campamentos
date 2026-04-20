@@ -1,32 +1,10 @@
 import prisma from "../lib/prisma.js";
 import { comparePassword, generateToken } from "../utils/auth.js";
 
-const isNonEmptyString = (value) => {
-  return typeof value === "string" && value.trim() !== "";
-};
 
 export const login = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
-    const { email, password } = req.body;
-
-    if (!isNonEmptyString(email)) {
-      return res.status(400).json({
-        error: "email es obligatorio",
-      });
-    }
-
-    if (!isNonEmptyString(password)) {
-      return res.status(400).json({
-        error: "password es obligatorio",
-      });
-    }
-
+    const { email, password } = req.validatedBody;
     const user = await prisma.user.findUnique({
       where: { email: email.trim() },
     });

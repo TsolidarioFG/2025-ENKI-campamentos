@@ -2,17 +2,10 @@ import prisma from "../lib/prisma.js";
 
 export const getDashboard = async (req, res) => {
   try {
-    const { summerCampId } = req.params;
-    const parsedId = Number(summerCampId);
-
-    if (!Number.isInteger(parsedId) || parsedId <= 0) {
-      return res.status(400).json({
-        error: "summerCampId inválido",
-      });
-    }
+    const { summerCampId } = req.validatedParams;
 
     const camp = await prisma.summerCamp.findUnique({
-      where: { id: parsedId },
+      where: { id: summerCampId },
       include: {
         weeks: {
           orderBy: { number: "asc" },
@@ -85,7 +78,7 @@ export const getDashboard = async (req, res) => {
 
 export const getInscriptionsTable = async (req, res) => {
   try {
-    const { summerCampId, accepted, waitlist } = req.query;
+    const { accepted, waitlist } = req.validatedQuery;
 
     const inscriptions = await prisma.inscription.findMany({
       include: {
@@ -128,10 +121,8 @@ export const getInscriptionsTable = async (req, res) => {
     });
 
     const filtered = result.filter((r) => {
-      if (accepted !== undefined && String(r.accepted) !== accepted)
-        return false;
-      if (waitlist !== undefined && String(r.waitlist) !== waitlist)
-        return false;
+      if (accepted !== undefined && r.accepted !== accepted) return false;
+      if (waitlist !== undefined && r.waitlist !== waitlist) return false;
       return true;
     });
 

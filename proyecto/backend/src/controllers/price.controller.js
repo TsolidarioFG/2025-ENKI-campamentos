@@ -1,82 +1,19 @@
 import prisma from "../lib/prisma.js";
 
-const parsePositiveInt = (value) => {
-  if (value === undefined || value === null || value === "") return null;
-
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-};
-
-const parseNonNegativeNumber = (value) => {
-  if (value === undefined || value === null || value === "") return null;
-
-  const parsed = Number(value);
-
-  if (Number.isNaN(parsed) || parsed < 0) {
-    return null;
-  }
-
-  return parsed;
-};
-
-const parseDateOrNull = (value) => {
-  if (value === undefined) return undefined;
-  if (value === null || value === "") return null;
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "INVALID_DATE";
-  }
-
-  return parsed;
-};
-
 export const getPrices = async (req, res) => {
   try {
-    const { summerCampId, number } = req.query;
-
-    if (summerCampId === undefined) {
-      return res.status(400).json({
-        error: "Es obligatorio incluir summerCampId",
-      });
-    }
-
-    const parsedSummerCampId = parsePositiveInt(summerCampId);
-    if (parsedSummerCampId === null) {
-      return res.status(400).json({
-        error: "summerCampId debe ser un número entero mayor que 0",
-      });
-    }
-
-    let parsedNumber;
-    if (number !== undefined) {
-      parsedNumber = parsePositiveInt(number);
-      if (parsedNumber === null) {
-        return res.status(400).json({
-          error: "number debe ser un número entero mayor que 0",
-        });
-      }
-    }
+    const { summerCampId, number } = req.validatedQuery;
 
     const where = {
       week: {
-        summerCampId: parsedSummerCampId,
-        ...(parsedNumber !== undefined ? { number: parsedNumber } : {}),
+        summerCampId,
+        ...(number !== undefined ? { number } : {}),
       },
     };
 
     const prices = await prisma.price.findMany({
       where,
-      orderBy: [
-        { weekId: "asc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ weekId: "asc" }, { createdAt: "desc" }],
       include: {
         week: {
           include: {
@@ -95,12 +32,6 @@ export const getPrices = async (req, res) => {
 
 export const createPrice = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       summerCampId,
       number,
@@ -109,101 +40,14 @@ export const createPrice = async (req, res) => {
       earlyRisePrice,
       breakfastPrice,
       lunchPrice,
-      validFrom,
-      validTo,
-      isActive,
       notes,
-    } = req.body;
-
-    if (
-      summerCampId === undefined ||
-      number === undefined ||
-      basePrice === undefined ||
-      disabilityPrice === undefined ||
-      earlyRisePrice === undefined ||
-      breakfastPrice === undefined ||
-      lunchPrice === undefined
-    ) {
-      return res.status(400).json({
-        error:
-          "summerCampId, number, basePrice, disabilityPrice, earlyRisePrice, breakfastPrice y lunchPrice son obligatorios",
-      });
-    }
-
-    if (validFrom !== undefined) {
-      return res.status(400).json({
-        error: "validFrom no puede enviarse al crear un precio",
-      });
-    }
-
-    if (validTo !== undefined) {
-      return res.status(400).json({
-        error: "validTo no puede enviarse al crear un precio",
-      });
-    }
-
-    if (isActive !== undefined) {
-      return res.status(400).json({
-        error: "isActive no puede enviarse al crear un precio",
-      });
-    }
-
-    const parsedSummerCampId = parsePositiveInt(summerCampId);
-    const parsedNumber = parsePositiveInt(number);
-
-    if (parsedSummerCampId === null) {
-      return res.status(400).json({
-        error: "summerCampId debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (parsedNumber === null) {
-      return res.status(400).json({
-        error: "number debe ser un número entero mayor que 0",
-      });
-    }
-
-    const parsedBasePrice = parseNonNegativeNumber(basePrice);
-    const parsedDisabilityPrice = parseNonNegativeNumber(disabilityPrice);
-    const parsedEarlyRisePrice = parseNonNegativeNumber(earlyRisePrice);
-    const parsedBreakfastPrice = parseNonNegativeNumber(breakfastPrice);
-    const parsedLunchPrice = parseNonNegativeNumber(lunchPrice);
-
-    if (parsedBasePrice === null) {
-      return res.status(400).json({
-        error: "basePrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedDisabilityPrice === null) {
-      return res.status(400).json({
-        error: "disabilityPrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedEarlyRisePrice === null) {
-      return res.status(400).json({
-        error: "earlyRisePrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedBreakfastPrice === null) {
-      return res.status(400).json({
-        error: "breakfastPrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedLunchPrice === null) {
-      return res.status(400).json({
-        error: "lunchPrice debe ser un número mayor o igual que 0",
-      });
-    }
+    } = req.validatedBody;
 
     const existingWeek = await prisma.week.findUnique({
       where: {
         summerCampId_number: {
-          summerCampId: parsedSummerCampId,
-          number: parsedNumber,
+          summerCampId,
+          number,
         },
       },
     });
@@ -231,11 +75,11 @@ export const createPrice = async (req, res) => {
 
     const newPrice = await prisma.price.create({
       data: {
-        basePrice: parsedBasePrice,
-        disabilityPrice: parsedDisabilityPrice,
-        earlyRisePrice: parsedEarlyRisePrice,
-        breakfastPrice: parsedBreakfastPrice,
-        lunchPrice: parsedLunchPrice,
+        basePrice,
+        disabilityPrice,
+        earlyRisePrice,
+        breakfastPrice,
+        lunchPrice,
         isActive: true,
         validFrom: now,
         validTo: null,
@@ -253,12 +97,6 @@ export const createPrice = async (req, res) => {
 
 export const updatePrice = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       summerCampId,
       number,
@@ -267,56 +105,14 @@ export const updatePrice = async (req, res) => {
       earlyRisePrice,
       breakfastPrice,
       lunchPrice,
-      validFrom,
-      validTo,
-      isActive,
       notes,
-    } = req.body;
-
-    if (summerCampId === undefined || number === undefined) {
-      return res.status(400).json({
-        error: "summerCampId y number son obligatorios",
-      });
-    }
-
-    if (validFrom !== undefined) {
-      return res.status(400).json({
-        error: "validFrom no puede modificarse manualmente en updatePrice",
-      });
-    }
-
-    if (validTo !== undefined) {
-      return res.status(400).json({
-        error: "validTo no puede modificarse manualmente en updatePrice",
-      });
-    }
-
-    if (isActive !== undefined) {
-      return res.status(400).json({
-        error: "isActive no puede modificarse manualmente en updatePrice",
-      });
-    }
-
-    const parsedSummerCampId = parsePositiveInt(summerCampId);
-    const parsedNumber = parsePositiveInt(number);
-
-    if (parsedSummerCampId === null) {
-      return res.status(400).json({
-        error: "summerCampId debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (parsedNumber === null) {
-      return res.status(400).json({
-        error: "number debe ser un número entero mayor que 0",
-      });
-    }
+    } = req.validatedBody;
 
     const existingWeek = await prisma.week.findUnique({
       where: {
         summerCampId_number: {
-          summerCampId: parsedSummerCampId,
-          number: parsedNumber,
+          summerCampId,
+          number,
         },
       },
     });
@@ -345,7 +141,8 @@ export const updatePrice = async (req, res) => {
 
     if (activePrices.length > 1) {
       return res.status(409).json({
-        error: "Hay más de un precio activo para esa semana. Los datos son inconsistentes",
+        error:
+          "Hay más de un precio activo para esa semana. Los datos son inconsistentes",
       });
     }
 
@@ -373,55 +170,6 @@ export const updatePrice = async (req, res) => {
       });
     }
 
-    if (
-      basePrice === undefined ||
-      disabilityPrice === undefined ||
-      earlyRisePrice === undefined ||
-      breakfastPrice === undefined ||
-      lunchPrice === undefined
-    ) {
-      return res.status(400).json({
-        error:
-          "Para crear un nuevo precio debes enviar basePrice, disabilityPrice, earlyRisePrice, breakfastPrice y lunchPrice. Si solo quieres cambiar notes, envía únicamente notes",
-      });
-    }
-
-    const parsedBasePrice = parseNonNegativeNumber(basePrice);
-    const parsedDisabilityPrice = parseNonNegativeNumber(disabilityPrice);
-    const parsedEarlyRisePrice = parseNonNegativeNumber(earlyRisePrice);
-    const parsedBreakfastPrice = parseNonNegativeNumber(breakfastPrice);
-    const parsedLunchPrice = parseNonNegativeNumber(lunchPrice);
-
-    if (parsedBasePrice === null) {
-      return res.status(400).json({
-        error: "basePrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedDisabilityPrice === null) {
-      return res.status(400).json({
-        error: "disabilityPrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedEarlyRisePrice === null) {
-      return res.status(400).json({
-        error: "earlyRisePrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedBreakfastPrice === null) {
-      return res.status(400).json({
-        error: "breakfastPrice debe ser un número mayor o igual que 0",
-      });
-    }
-
-    if (parsedLunchPrice === null) {
-      return res.status(400).json({
-        error: "lunchPrice debe ser un número mayor o igual que 0",
-      });
-    }
-
     const now = new Date();
 
     const result = await prisma.$transaction(async (tx) => {
@@ -435,11 +183,11 @@ export const updatePrice = async (req, res) => {
 
       const newPrice = await tx.price.create({
         data: {
-          basePrice: parsedBasePrice,
-          disabilityPrice: parsedDisabilityPrice,
-          earlyRisePrice: parsedEarlyRisePrice,
-          breakfastPrice: parsedBreakfastPrice,
-          lunchPrice: parsedLunchPrice,
+          basePrice,
+          disabilityPrice,
+          earlyRisePrice,
+          breakfastPrice,
+          lunchPrice,
           isActive: true,
           validFrom: now,
           validTo: null,

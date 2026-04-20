@@ -1,37 +1,10 @@
 import prisma from "../lib/prisma.js";
 import {
-  normalizeText,
-  normalizeEmail,
-  isValidPhone,
-  isValidEmail,
-  isValidHealthCard,
-  isValidDniNie,
-  isValidPostalCode,
-} from "../utils/validators.js";
-import {
   extractManualDiscountRequests,
   resolveApplicableDiscountsForCreation,
   createInscriptionDiscountRows,
   applyDiscountsToAmount,
 } from "../services/discount.service.js";
-
-const isNonEmptyString = (value) => {
-  return typeof value === "string" && value.trim() !== "";
-};
-
-const isBoolean = (value) => {
-  return typeof value === "boolean";
-};
-
-const isValidDate = (value) => {
-  const parsed = new Date(value);
-  return !Number.isNaN(parsed.getTime());
-};
-
-const isPositiveInteger = (value) => {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0;
-};
 
 const getInitialWeekState = ({ hasDisability, week }) => {
   if (hasDisability) {
@@ -162,7 +135,7 @@ const createReservationPaymentsForSignedUps = async ({
 
 export const getInscriptions = async (req, res) => {
   try {
-    const { summerCampId, number, globalStatus, paymentMode } = req.query;
+    const { summerCampId, number, globalStatus, paymentMode } = req.validatedQuery;
 
     const where = {};
 
@@ -180,33 +153,17 @@ export const getInscriptions = async (req, res) => {
       };
 
       if (summerCampId !== undefined) {
-        const parsedSummerCampId = Number(summerCampId);
-
-        if (!Number.isInteger(parsedSummerCampId) || parsedSummerCampId <= 0) {
-          return res.status(400).json({
-            error: "summerCampId debe ser un número entero mayor que 0",
-          });
-        }
-
         where.signedUpWeeks.some.week = {
-          summerCampId: parsedSummerCampId,
+          summerCampId,
         };
       }
 
       if (number !== undefined) {
-        const parsedNumber = Number(number);
-
-        if (!Number.isInteger(parsedNumber) || parsedNumber <= 0) {
-          return res.status(400).json({
-            error: "number debe ser un número entero mayor que 0",
-          });
-        }
-
         if (!where.signedUpWeeks.some.week) {
           where.signedUpWeeks.some.week = {};
         }
 
-        where.signedUpWeeks.some.week.number = parsedNumber;
+        where.signedUpWeeks.some.week.number = number;
       }
     }
 
@@ -257,18 +214,10 @@ export const getInscriptions = async (req, res) => {
 
 export const getInscriptionById = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const parsedId = Number(id);
-
-    if (!Number.isInteger(parsedId) || parsedId <= 0) {
-      return res.status(400).json({
-        error: "id debe ser un número entero mayor que 0",
-      });
-    }
+    const { id } = req.validatedParams;
 
     const inscription = await prisma.inscription.findUnique({
-      where: { id: parsedId },
+      where: { id },
       include: {
         participant: {
           include: {
@@ -329,12 +278,6 @@ export const getInscriptionById = async (req, res) => {
 
 export const createInscription = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       participant,
       guardian,
@@ -343,356 +286,7 @@ export const createInscription = async (req, res) => {
       inscription,
       weeks,
       discounts = [],
-    } = req.body;
-
-    if (!participant || typeof participant !== "object" || Array.isArray(participant)) {
-      return res.status(400).json({
-        error: "participant es obligatorio y debe ser un objeto",
-      });
-    }
-
-    if (!guardian || typeof guardian !== "object" || Array.isArray(guardian)) {
-      return res.status(400).json({
-        error: "guardian es obligatorio y debe ser un objeto",
-      });
-    }
-
-    if (!address || typeof address !== "object" || Array.isArray(address)) {
-      return res.status(400).json({
-        error: "address es obligatorio y debe ser un objeto",
-      });
-    }
-
-    if (!inscription || typeof inscription !== "object" || Array.isArray(inscription)) {
-      return res.status(400).json({
-        error: "inscription es obligatorio y debe ser un objeto",
-      });
-    }
-
-    if (!Array.isArray(authorizedPeople)) {
-      return res.status(400).json({
-        error: "authorizedPeople debe ser un array",
-      });
-    }
-
-    if (!Array.isArray(weeks) || weeks.length === 0) {
-      return res.status(400).json({
-        error: "weeks debe ser un array con al menos una semana",
-      });
-    }
-
-    if (!Array.isArray(discounts)) {
-      return res.status(400).json({
-        error: "discounts debe ser un array",
-      });
-    }
-
-    participant.name = normalizeText(participant.name);
-    participant.surname = normalizeText(participant.surname);
-    participant.gender = normalizeText(participant.gender);
-    participant.healthCard = participant.healthCard
-      ? normalizeText(String(participant.healthCard)).toUpperCase()
-      : participant.healthCard;
-    participant.schoolObservations = normalizeText(participant.schoolObservations);
-    participant.notes = normalizeText(participant.notes);
-
-    guardian.name = normalizeText(guardian.name);
-    guardian.surname = normalizeText(guardian.surname);
-    guardian.dni = guardian.dni ? normalizeText(guardian.dni).toUpperCase() : guardian.dni;
-    guardian.phone = guardian.phone ? String(guardian.phone).trim() : guardian.phone;
-    guardian.phone2 = guardian.phone2 ? String(guardian.phone2).trim() : guardian.phone2;
-    guardian.email = normalizeEmail(guardian.email);
-    guardian.email2 = guardian.email2 ? normalizeEmail(guardian.email2) : guardian.email2;
-    guardian.relation = normalizeText(guardian.relation);
-
-    address.street = normalizeText(address.street);
-    address.city = normalizeText(address.city);
-    address.province = normalizeText(address.province);
-    address.postalCode = address.postalCode ? String(address.postalCode).trim() : address.postalCode;
-
-    inscription.paymentMode = normalizeText(inscription.paymentMode);
-    inscription.invoiceName = normalizeText(inscription.invoiceName);
-    inscription.invoiceDni = inscription.invoiceDni
-      ? normalizeText(inscription.invoiceDni).toUpperCase()
-      : inscription.invoiceDni;
-    inscription.notes = normalizeText(inscription.notes);
-
-    if (!isNonEmptyString(participant.name)) {
-      return res.status(400).json({
-        error: "participant.name es obligatorio",
-      });
-    }
-
-    if (!isNonEmptyString(participant.surname)) {
-      return res.status(400).json({
-        error: "participant.surname es obligatorio",
-      });
-    }
-
-    if (!participant.birthdate || !isValidDate(participant.birthdate)) {
-      return res.status(400).json({
-        error: "participant.birthdate es obligatorio y debe ser una fecha válida",
-      });
-    }
-
-    if (
-      participant.hasDisability !== undefined &&
-      !isBoolean(participant.hasDisability)
-    ) {
-      return res.status(400).json({
-        error: "participant.hasDisability debe ser booleano",
-      });
-    }
-
-    if (
-      participant.repeatedBefore !== undefined &&
-      !isBoolean(participant.repeatedBefore)
-    ) {
-      return res.status(400).json({
-        error: "participant.repeatedBefore debe ser booleano",
-      });
-    }
-
-    if (
-      participant.siblings !== undefined &&
-      !isBoolean(participant.siblings)
-    ) {
-      return res.status(400).json({
-        error: "participant.siblings debe ser booleano",
-      });
-    }
-
-    if (
-      participant.schoolRelated !== undefined &&
-      !isBoolean(participant.schoolRelated)
-    ) {
-      return res.status(400).json({
-        error: "participant.schoolRelated debe ser booleano",
-      });
-    }
-
-    if (participant.healthCard && !isValidHealthCard(participant.healthCard)) {
-      return res.status(400).json({
-        error: "participant.healthCard tiene un formato inválido",
-      });
-    }
-
-    if (!isNonEmptyString(guardian.name)) {
-      return res.status(400).json({
-        error: "guardian.name es obligatorio",
-      });
-    }
-
-    if (!isNonEmptyString(guardian.surname)) {
-      return res.status(400).json({
-        error: "guardian.surname es obligatorio",
-      });
-    }
-
-    if (!isNonEmptyString(guardian.phone)) {
-      return res.status(400).json({
-        error: "guardian.phone es obligatorio",
-      });
-    }
-
-    if (!isValidPhone(guardian.phone)) {
-      return res.status(400).json({
-        error: "guardian.phone tiene un formato inválido",
-      });
-    }
-
-    if (guardian.phone2 && !isValidPhone(guardian.phone2)) {
-      return res.status(400).json({
-        error: "guardian.phone2 tiene un formato inválido",
-      });
-    }
-
-    if (!isNonEmptyString(guardian.email)) {
-      return res.status(400).json({
-        error: "guardian.email es obligatorio",
-      });
-    }
-
-    if (!isValidEmail(guardian.email)) {
-      return res.status(400).json({
-        error: "guardian.email tiene un formato inválido",
-      });
-    }
-
-    if (guardian.email2 && !isValidEmail(guardian.email2)) {
-      return res.status(400).json({
-        error: "guardian.email2 tiene un formato inválido",
-      });
-    }
-
-    if (guardian.dni && !isValidDniNie(guardian.dni)) {
-      return res.status(400).json({
-        error: "guardian.dni tiene un formato inválido o letra incorrecta",
-      });
-    }
-
-    if (!isNonEmptyString(address.city)) {
-      return res.status(400).json({
-        error: "address.city es obligatorio",
-      });
-    }
-
-    if (!isNonEmptyString(address.province)) {
-      return res.status(400).json({
-        error: "address.province es obligatorio",
-      });
-    }
-
-    if (address.postalCode && !isValidPostalCode(address.postalCode)) {
-      return res.status(400).json({
-        error: "address.postalCode tiene un formato inválido",
-      });
-    }
-
-    for (let i = 0; i < authorizedPeople.length; i++) {
-      const person = authorizedPeople[i];
-
-      if (!person || typeof person !== "object" || Array.isArray(person)) {
-        return res.status(400).json({
-          error: `authorizedPeople[${i}] debe ser un objeto válido`,
-        });
-      }
-
-      person.name = normalizeText(person.name);
-      person.surname = normalizeText(person.surname);
-      person.dni = person.dni ? normalizeText(person.dni).toUpperCase() : person.dni;
-      person.phone = person.phone ? String(person.phone).trim() : person.phone;
-      person.relation = normalizeText(person.relation);
-
-      if (!isNonEmptyString(person.name)) {
-        return res.status(400).json({
-          error: `authorizedPeople[${i}].name es obligatorio`,
-        });
-      }
-
-      if (!isNonEmptyString(person.surname)) {
-        return res.status(400).json({
-          error: `authorizedPeople[${i}].surname es obligatorio`,
-        });
-      }
-
-      if (person.phone && !isValidPhone(person.phone)) {
-        return res.status(400).json({
-          error: `authorizedPeople[${i}].phone tiene un formato inválido`,
-        });
-      }
-
-      if (person.dni && !isValidDniNie(person.dni)) {
-        return res.status(400).json({
-          error: `authorizedPeople[${i}].dni tiene un formato inválido o letra incorrecta`,
-        });
-      }
-    }
-
-    if (!isNonEmptyString(inscription.paymentMode)) {
-      return res.status(400).json({
-        error: "inscription.paymentMode es obligatorio",
-      });
-    }
-
-    const validPaymentModes = ["ONE_PAYMENT", "TWO_PAYMENTS"];
-    if (!validPaymentModes.includes(inscription.paymentMode)) {
-      return res.status(400).json({
-        error: "inscription.paymentMode debe ser ONE_PAYMENT o TWO_PAYMENTS",
-      });
-    }
-
-    if (
-      inscription.invoiceRequested !== undefined &&
-      !isBoolean(inscription.invoiceRequested)
-    ) {
-      return res.status(400).json({
-        error: "inscription.invoiceRequested debe ser booleano",
-      });
-    }
-
-    if (
-      !isBoolean(inscription.dataTreatmentAccepted) ||
-      !inscription.dataTreatmentAccepted
-    ) {
-      return res.status(400).json({
-        error: "Debe aceptarse el tratamiento de datos",
-      });
-    }
-
-    if (!isBoolean(inscription.outingsAccepted)) {
-      return res.status(400).json({
-        error: "inscription.outingsAccepted debe ser booleano",
-      });
-    }
-
-    if (!isBoolean(inscription.imagesAccepted)) {
-      return res.status(400).json({
-        error: "inscription.imagesAccepted debe ser booleano",
-      });
-    }
-
-    if (inscription.invoiceRequested === true) {
-      if (!isNonEmptyString(inscription.invoiceName)) {
-        return res.status(400).json({
-          error: "inscription.invoiceName es obligatorio si se solicita factura",
-        });
-      }
-
-      if (inscription.invoiceDni && !isValidDniNie(inscription.invoiceDni)) {
-        return res.status(400).json({
-          error: "inscription.invoiceDni tiene un formato inválido o letra incorrecta",
-        });
-      }
-    }
-
-    const seenWeeks = new Set();
-
-    for (const week of weeks) {
-      if (!week || typeof week !== "object" || Array.isArray(week)) {
-        return res.status(400).json({
-          error: "Cada elemento de weeks debe ser un objeto válido",
-        });
-      }
-
-      if (!isPositiveInteger(week.summerCampId)) {
-        return res.status(400).json({
-          error: "Cada semana debe incluir un summerCampId válido",
-        });
-      }
-
-      if (!isPositiveInteger(week.number)) {
-        return res.status(400).json({
-          error: "Cada semana debe incluir un number válido",
-        });
-      }
-
-      const key = `${week.summerCampId}-${week.number}`;
-      if (seenWeeks.has(key)) {
-        return res.status(400).json({
-          error: "No se puede repetir la misma semana en una inscripción",
-        });
-      }
-      seenWeeks.add(key);
-
-      if (week.breakfast !== undefined && !isBoolean(week.breakfast)) {
-        return res.status(400).json({
-          error: "week.breakfast debe ser booleano",
-        });
-      }
-
-      if (week.lunch !== undefined && !isBoolean(week.lunch)) {
-        return res.status(400).json({
-          error: "week.lunch debe ser booleano",
-        });
-      }
-
-      if (week.earlyRise !== undefined && !isBoolean(week.earlyRise)) {
-        return res.status(400).json({
-          error: "week.earlyRise debe ser booleano",
-        });
-      }
-    }
+    } = req.validatedBody;
 
     const manualDiscountRequests = extractManualDiscountRequests({ discounts });
     const hasDisability = participant.hasDisability === true;
@@ -705,8 +299,8 @@ export const createInscription = async (req, res) => {
         const foundWeek = await tx.week.findUnique({
           where: {
             summerCampId_number: {
-              summerCampId: Number(selectedWeek.summerCampId),
-              number: Number(selectedWeek.number),
+              summerCampId: selectedWeek.summerCampId,
+              number: selectedWeek.number,
             },
           },
           include: {
@@ -768,8 +362,8 @@ export const createInscription = async (req, res) => {
 
       const createdParticipant = await tx.participant.create({
         data: {
-          name: participant.name.trim(),
-          surname: participant.surname.trim(),
+          name: participant.name,
+          surname: participant.surname,
           birthdate: new Date(participant.birthdate),
           gender: participant.gender || null,
           healthCard: participant.healthCard || null,
@@ -784,12 +378,12 @@ export const createInscription = async (req, res) => {
 
       await tx.guardian.create({
         data: {
-          name: guardian.name.trim(),
-          surname: guardian.surname.trim(),
+          name: guardian.name,
+          surname: guardian.surname,
           dni: guardian.dni || null,
-          phone: guardian.phone.trim(),
+          phone: guardian.phone,
           phone2: guardian.phone2 || null,
-          email: guardian.email.trim(),
+          email: guardian.email,
           email2: guardian.email2 || null,
           relation: guardian.relation || null,
           participantId: createdParticipant.id,
@@ -809,8 +403,8 @@ export const createInscription = async (req, res) => {
       for (const person of authorizedPeople) {
         await tx.authorizedPerson.create({
           data: {
-            name: person.name.trim(),
-            surname: person.surname.trim(),
+            name: person.name,
+            surname: person.surname,
             dni: person.dni || null,
             phone: person.phone || null,
             relation: person.relation || null,
@@ -1001,19 +595,11 @@ export const createInscription = async (req, res) => {
 
 export const cancelInscription = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const parsedId = Number(id);
-
-    if (!Number.isInteger(parsedId) || parsedId <= 0) {
-      return res.status(400).json({
-        error: "id debe ser un número entero mayor que 0",
-      });
-    }
+    const { id } = req.validatedParams;
 
     const result = await prisma.$transaction(async (tx) => {
       const inscription = await tx.inscription.findUnique({
-        where: { id: parsedId },
+        where: { id },
         include: {
           participant: true,
           signedUpWeeks: {
@@ -1065,7 +651,7 @@ export const cancelInscription = async (req, res) => {
               weekId: signedUp.weekId,
               state: "WAITLIST",
               inscriptionId: {
-                not: parsedId,
+                not: id,
               },
             },
           });
@@ -1104,14 +690,14 @@ export const cancelInscription = async (req, res) => {
       }
 
       await tx.inscription.update({
-        where: { id: parsedId },
+        where: { id },
         data: {
           globalStatus: "CANCELLED",
         },
       });
 
       return tx.inscription.findUnique({
-        where: { id: parsedId },
+        where: { id },
         include: {
           participant: true,
           signedUpWeeks: {

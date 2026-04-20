@@ -1,12 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { hashPassword } from "../utils/auth.js";
 
-const isNonEmptyString = (value) => {
-  return typeof value === "string" && value.trim() !== "";
-};
-
-const validCreatableRoles = ["ADMIN", "USER"];
-
 export const getUsers = async (req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -38,52 +32,16 @@ export const getUsers = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       username,
       email,
       password,
       role,
       active,
-    } = req.body;
-
-    if (!isNonEmptyString(username)) {
-      return res.status(400).json({
-        error: "username es obligatorio",
-      });
-    }
-
-    if (!isNonEmptyString(email)) {
-      return res.status(400).json({
-        error: "email es obligatorio",
-      });
-    }
-
-    if (!isNonEmptyString(password)) {
-      return res.status(400).json({
-        error: "password es obligatorio",
-      });
-    }
-
-    if (!validCreatableRoles.includes(role)) {
-      return res.status(400).json({
-        error: "role debe ser ADMIN o USER",
-      });
-    }
-
-    if (password.trim().length < 6) {
-      return res.status(400).json({
-        error: "La contraseña debe tener al menos 6 caracteres",
-      });
-    }
+    } = req.validatedBody;
 
     const existingUsername = await prisma.user.findUnique({
-      where: { username: username.trim() },
+      where: { username: username },
     });
 
     if (existingUsername) {
@@ -93,7 +51,7 @@ export const createUser = async (req, res) => {
     }
 
     const existingEmail = await prisma.user.findUnique({
-      where: { email: email.trim() },
+      where: { email: email },
     });
 
     if (existingEmail) {
@@ -102,12 +60,12 @@ export const createUser = async (req, res) => {
       });
     }
 
-    const passwordHash = await hashPassword(password.trim());
+    const passwordHash = await hashPassword(password);
 
     const user = await prisma.user.create({
       data: {
-        username: username.trim(),
-        email: email.trim(),
+        username: username,
+        email: email,
         passwordHash,
         role,
         active: active ?? true,
@@ -137,25 +95,11 @@ export const createUser = async (req, res) => {
 
 export const updateUserStatus = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { active } = req.body;
-
-    const parsedId = Number(id);
-
-    if (!Number.isInteger(parsedId) || parsedId <= 0) {
-      return res.status(400).json({
-        error: "id inválido",
-      });
-    }
-
-    if (typeof active !== "boolean") {
-      return res.status(400).json({
-        error: "active debe ser booleano",
-      });
-    }
+    const { id } = req.validatedParams;
+    const { active } = req.validatedBody;
 
     const existingUser = await prisma.user.findUnique({
-      where: { id: parsedId },
+      where: { id: id },
     });
 
     if (!existingUser) {
@@ -171,7 +115,7 @@ export const updateUserStatus = async (req, res) => {
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: parsedId },
+      where: { id: id },
       data: { active },
       select: {
         id: true,

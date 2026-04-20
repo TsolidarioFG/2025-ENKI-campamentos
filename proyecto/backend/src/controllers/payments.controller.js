@@ -3,34 +3,6 @@ import {
   getApplicableDiscountsForInscription,
   applyDiscountsToAmount,
 } from "../services/discount.service.js";
-const isNonEmptyString = (value) => {
-  return typeof value === "string" && value.trim() !== "";
-};
-
-const isValidDate = (value) => {
-  const parsed = new Date(value);
-  return !Number.isNaN(parsed.getTime());
-};
-
-const validPaymentMethods = [
-  "BANK_TRANSFER",
-  "CASH",
-  "CARD",
-  "BIZUM",
-  "OTHER",
-];
-
-const validExtraPurposes = [
-  "BREAKFAST",
-  "LUNCH",
-  "EARLY_RISE",
-  "OTHER",
-];
-
-const validPaymentModes = [
-  "ONE_PAYMENT",
-  "TWO_PAYMENTS",
-];
 
 const getGlobalInscriptionStatus = (states) => {
   if (states.length === 0) return "PENDING";
@@ -58,20 +30,12 @@ const splitAmountInTwo = (amount) => {
 
 export const getPayments = async (req, res) => {
   try {
-    const { inscriptionId, status, paymentType } = req.query;
+    const { inscriptionId, status, paymentType } = req.validatedQuery;
 
     const where = {};
 
     if (inscriptionId !== undefined) {
-      const parsedInscriptionId = Number(inscriptionId);
-
-      if (!Number.isInteger(parsedInscriptionId) || parsedInscriptionId <= 0) {
-        return res.status(400).json({
-          error: "inscriptionId debe ser un número entero mayor que 0",
-        });
-      }
-
-      where.inscriptionId = parsedInscriptionId;
+      where.inscriptionId = inscriptionId;
     }
 
     if (status !== undefined) {
@@ -114,18 +78,10 @@ export const getPayments = async (req, res) => {
 
 export const getPaymentById = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const parsedId = Number(id);
-
-    if (!Number.isInteger(parsedId) || parsedId <= 0) {
-      return res.status(400).json({
-        error: "id debe ser un número entero mayor que 0",
-      });
-    }
+    const { id } = req.validatedParams;
 
     const payment = await prisma.payment.findUnique({
-      where: { id: parsedId },
+      where: { id },
       include: {
         inscription: {
           include: {
@@ -166,12 +122,6 @@ export const getPaymentById = async (req, res) => {
 
 export const createExtraPayment = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       inscriptionId,
       weekId,
@@ -183,56 +133,16 @@ export const createExtraPayment = async (req, res) => {
       notes,
       receiptRequested,
       isMandatory,
-    } = req.body;
+    } = req.validatedBody;
 
-    const parsedInscriptionId = Number(inscriptionId);
-    const parsedWeekId = Number(weekId);
-    const parsedAmount = Number(amount);
-
-    if (!Number.isInteger(parsedInscriptionId) || parsedInscriptionId <= 0) {
-      return res.status(400).json({
-        error: "inscriptionId debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (!Number.isInteger(parsedWeekId) || parsedWeekId <= 0) {
-      return res.status(400).json({
-        error: "weekId debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (!validExtraPurposes.includes(purpose)) {
-      return res.status(400).json({
-        error: "purpose debe ser BREAKFAST, LUNCH, EARLY_RISE o OTHER",
-      });
-    }
-
-    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      return res.status(400).json({
-        error: "amount debe ser un número mayor que 0",
-      });
-    }
-
-    if (!validPaymentModes.includes(paymentMode)) {
-      return res.status(400).json({
-        error: "paymentMode debe ser ONE_PAYMENT o TWO_PAYMENTS",
-      });
-    }
-
-    if (dueDate !== undefined && !isValidDate(dueDate)) {
-      return res.status(400).json({
-        error: "dueDate debe ser una fecha válida",
-      });
-    }
-
-    const finalDueDate = dueDate ? new Date(dueDate) : null;
+    const finalDueDate = dueDate ?? null;
 
     const result = await prisma.$transaction(async (tx) => {
       const signedUp = await tx.signedUp.findUnique({
         where: {
           inscriptionId_weekId: {
-            inscriptionId: parsedInscriptionId,
-            weekId: parsedWeekId,
+            inscriptionId,
+            weekId,
           },
         },
         include: {
@@ -253,14 +163,10 @@ export const createExtraPayment = async (req, res) => {
 
       const applicableDiscounts = await getApplicableDiscountsForInscription(
         tx,
-        parsedInscriptionId
+        inscriptionId
       );
 
-      const discountResult = applyDiscountsToAmount(
-        parsedAmount,
-        applicableDiscounts
-      );
-
+      const discountResult = applyDiscountsToAmount(amount, applicableDiscounts);
       const finalExtraAmount = discountResult.finalAmount;
 
       if (paymentMode === "ONE_PAYMENT") {
@@ -276,15 +182,15 @@ export const createExtraPayment = async (req, res) => {
             receiptRequested: receiptRequested ?? false,
             isMandatory: isMandatory ?? true,
             notes: notes || null,
-            inscriptionId: parsedInscriptionId,
+            inscriptionId,
           },
         });
 
         await tx.paymentSignedUp.create({
           data: {
             paymentId: payment.id,
-            inscriptionId: parsedInscriptionId,
-            weekId: parsedWeekId,
+            inscriptionId,
+            weekId,
             purpose,
             amount: finalExtraAmount,
             notes: notes || null,
@@ -307,7 +213,7 @@ export const createExtraPayment = async (req, res) => {
             receiptRequested: receiptRequested ?? false,
             isMandatory: isMandatory ?? true,
             notes: notes || null,
-            inscriptionId: parsedInscriptionId,
+            inscriptionId,
           },
         });
 
@@ -323,15 +229,15 @@ export const createExtraPayment = async (req, res) => {
             receiptRequested: receiptRequested ?? false,
             isMandatory: isMandatory ?? true,
             notes: notes || null,
-            inscriptionId: parsedInscriptionId,
+            inscriptionId,
           },
         });
 
         await tx.paymentSignedUp.create({
           data: {
             paymentId: firstPayment.id,
-            inscriptionId: parsedInscriptionId,
-            weekId: parsedWeekId,
+            inscriptionId,
+            weekId,
             purpose,
             amount: firstAmount,
             notes: notes || null,
@@ -341,8 +247,8 @@ export const createExtraPayment = async (req, res) => {
         await tx.paymentSignedUp.create({
           data: {
             paymentId: secondPayment.id,
-            inscriptionId: parsedInscriptionId,
-            weekId: parsedWeekId,
+            inscriptionId,
+            weekId,
             purpose,
             amount: secondAmount,
             notes: notes || null,
@@ -351,7 +257,7 @@ export const createExtraPayment = async (req, res) => {
       }
 
       const updatedInscription = await tx.inscription.update({
-        where: { id: parsedInscriptionId },
+        where: { id: inscriptionId },
         data: {
           totalAmountExpected:
             signedUp.inscription.totalAmountExpected + finalExtraAmount,
@@ -408,46 +314,14 @@ export const createExtraPayment = async (req, res) => {
 
 export const registerPayment = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { method, paidAt, notes } = req.body;
+    const { id } = req.validatedParams;
+    const { method, paidAt, notes } = req.validatedBody;
 
-    const parsedId = Number(id);
-
-    if (!Number.isInteger(parsedId) || parsedId <= 0) {
-      return res.status(400).json({
-        error: "id debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
-    if (!isNonEmptyString(method)) {
-      return res.status(400).json({
-        error: "method es obligatorio",
-      });
-    }
-
-    if (!validPaymentMethods.includes(method)) {
-      return res.status(400).json({
-        error: "method debe ser BANK_TRANSFER, CASH, CARD, BIZUM o OTHER",
-      });
-    }
-
-    if (paidAt !== undefined && !isValidDate(paidAt)) {
-      return res.status(400).json({
-        error: "paidAt debe ser una fecha válida",
-      });
-    }
-
-    const finalPaidAt = paidAt ? new Date(paidAt) : new Date();
+    const finalPaidAt = paidAt ?? new Date();
 
     const result = await prisma.$transaction(async (tx) => {
       const existingPayment = await tx.payment.findUnique({
-        where: { id: parsedId },
+        where: { id },
         include: {
           inscription: {
             include: {
@@ -487,7 +361,7 @@ export const registerPayment = async (req, res) => {
       }
 
       await tx.payment.update({
-        where: { id: parsedId },
+        where: { id },
         data: {
           status: "PAID",
           method,
@@ -503,7 +377,7 @@ export const registerPayment = async (req, res) => {
       });
 
       const totalAmountPaid = inscriptionPayments.reduce((sum, payment) => {
-        if (payment.id === parsedId) {
+        if (payment.id === id) {
           return sum + payment.amount;
         }
 
@@ -533,22 +407,20 @@ export const registerPayment = async (req, res) => {
       );
 
       for (const allocation of reservationAllocations) {
-        const allReservationAllocationsForSignedUp = await tx.paymentSignedUp.findMany({
-          where: {
-            inscriptionId: allocation.inscriptionId,
-            weekId: allocation.weekId,
-            purpose: "RESERVATION",
-          },
-          include: {
-            payment: true,
-          },
-        });
+        const allReservationAllocationsForSignedUp =
+          await tx.paymentSignedUp.findMany({
+            where: {
+              inscriptionId: allocation.inscriptionId,
+              weekId: allocation.weekId,
+              purpose: "RESERVATION",
+            },
+            include: {
+              payment: true,
+            },
+          });
 
-        const fullyPaid = allReservationAllocationsForSignedUp.every(
-          (item) =>
-            item.payment.id === parsedId
-              ? true
-              : item.payment.status === "PAID"
+        const fullyPaid = allReservationAllocationsForSignedUp.every((item) =>
+          item.payment.id === id ? true : item.payment.status === "PAID"
         );
 
         if (fullyPaid) {
@@ -598,7 +470,7 @@ export const registerPayment = async (req, res) => {
       });
 
       return tx.payment.findUnique({
-        where: { id: parsedId },
+        where: { id },
         include: {
           inscription: {
             include: {

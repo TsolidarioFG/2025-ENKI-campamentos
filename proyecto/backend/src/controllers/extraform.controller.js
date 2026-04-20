@@ -2,12 +2,6 @@ import prisma from "../lib/prisma.js";
 
 export const createExtraForm = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       calledBefore,
       routines,
@@ -23,24 +17,15 @@ export const createExtraForm = async (req, res) => {
       chokingEpisodes,
       extraInfo,
       participantId,
-
       disability,
       sports,
       fears,
       communication,
       foodSensitivities,
-    } = req.body;
-
-    const parsedParticipantId = Number(participantId);
-
-    if (!Number.isInteger(parsedParticipantId) || parsedParticipantId <= 0) {
-      return res.status(400).json({
-        error: "participantId debe ser un entero positivo válido",
-      });
-    }
+    } = req.validatedBody;
 
     const existingParticipant = await prisma.participant.findUnique({
-      where: { id: parsedParticipantId },
+      where: { id: participantId },
       include: {
         extraForm: true,
       },
@@ -74,11 +59,11 @@ export const createExtraForm = async (req, res) => {
           feedingAdaptation: feedingAdaptation || null,
           chokingEpisodes,
           extraInfo: extraInfo || null,
-          participantId: parsedParticipantId,
+          participantId,
         },
       });
 
-      if (disability && typeof disability === "object" && !Array.isArray(disability)) {
+      if (disability) {
         await tx.disability.create({
           data: {
             functionalDiversity: disability.functionalDiversity || null,
@@ -100,10 +85,6 @@ export const createExtraForm = async (req, res) => {
 
       if (Array.isArray(sports) && sports.length > 0) {
         for (const item of sports) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada sport debe ser un objeto válido");
-          }
-
           await tx.sport.create({
             data: {
               doesSport: item.doesSport,
@@ -119,10 +100,6 @@ export const createExtraForm = async (req, res) => {
 
       if (Array.isArray(fears) && fears.length > 0) {
         for (const item of fears) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada fear debe ser un objeto válido");
-          }
-
           await tx.fear.create({
             data: {
               fears: item.fears || null,
@@ -135,10 +112,6 @@ export const createExtraForm = async (req, res) => {
 
       if (Array.isArray(communication) && communication.length > 0) {
         for (const item of communication) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada communication debe ser un objeto válido");
-          }
-
           await tx.communication.create({
             data: {
               oralLanguage: item.oralLanguage || null,
@@ -159,10 +132,6 @@ export const createExtraForm = async (req, res) => {
 
       if (Array.isArray(foodSensitivities) && foodSensitivities.length > 0) {
         for (const item of foodSensitivities) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada foodSensitivity debe ser un objeto válido");
-          }
-
           await tx.foodSensitivity.create({
             data: {
               type: item.type,
@@ -213,14 +182,7 @@ export const createExtraForm = async (req, res) => {
 
 export const getExtraFormByParticipantId = async (req, res) => {
   try {
-    let { participantId } = req.params;
-    participantId = Number(participantId);
-
-    if (!Number.isInteger(participantId) || participantId <= 0) {
-      return res.status(400).json({
-        error: "participantId debe ser un entero positivo válido",
-      });
-    }
+    const { participantId } = req.validatedParams;
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },
@@ -261,12 +223,6 @@ export const getExtraFormByParticipantId = async (req, res) => {
 
 export const updateExtraForm = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       calledBefore,
       routines,
@@ -282,24 +238,15 @@ export const updateExtraForm = async (req, res) => {
       chokingEpisodes,
       extraInfo,
       participantId,
-
       disability,
       sports,
       fears,
       communication,
       foodSensitivities,
-    } = req.body;
-
-    const parsedParticipantId = Number(participantId);
-
-    if (!Number.isInteger(parsedParticipantId) || parsedParticipantId <= 0) {
-      return res.status(400).json({
-        error: "participantId debe ser un entero positivo válido",
-      });
-    }
+    } = req.validatedBody;
 
     const existingParticipant = await prisma.participant.findUnique({
-      where: { id: parsedParticipantId },
+      where: { id: participantId },
       include: {
         extraForm: {
           include: {
@@ -357,7 +304,7 @@ export const updateExtraForm = async (req, res) => {
         data: extraFormData,
       });
 
-      if (disability && typeof disability === "object" && !Array.isArray(disability)) {
+      if (disability) {
         if (existingExtraForm.disability) {
           const disabilityData = {};
 
@@ -425,10 +372,6 @@ export const updateExtraForm = async (req, res) => {
 
       if (Array.isArray(sports)) {
         for (const item of sports) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada sport debe ser un objeto válido");
-          }
-
           if (item.id !== undefined) {
             const existingSport = await tx.sport.findFirst({
               where: {
@@ -477,10 +420,6 @@ export const updateExtraForm = async (req, res) => {
 
       if (Array.isArray(fears)) {
         for (const item of fears) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada fear debe ser un objeto válido");
-          }
-
           if (item.id !== undefined) {
             const existingFear = await tx.fear.findFirst({
               where: {
@@ -517,10 +456,6 @@ export const updateExtraForm = async (req, res) => {
 
       if (Array.isArray(communication)) {
         for (const item of communication) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada communication debe ser un objeto válido");
-          }
-
           if (item.id !== undefined) {
             const existingCommunication = await tx.communication.findFirst({
               where: {
@@ -592,10 +527,6 @@ export const updateExtraForm = async (req, res) => {
 
       if (Array.isArray(foodSensitivities)) {
         for (const item of foodSensitivities) {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
-            throw new Error("Cada foodSensitivity debe ser un objeto válido");
-          }
-
           if (item.id !== undefined) {
             const existingFoodSensitivity = await tx.foodSensitivity.findFirst({
               where: {
@@ -673,16 +604,10 @@ export const updateExtraForm = async (req, res) => {
     });
   }
 };
+
 export const deleteExtraFormByParticipantId = async (req, res) => {
   try {
-    let { participantId } = req.params;
-    participantId = Number(participantId);
-
-    if (!Number.isInteger(participantId) || participantId <= 0) {
-      return res.status(400).json({
-        error: "participantId debe ser un entero positivo válido",
-      });
-    }
+    const { participantId } = req.validatedParams;
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },
@@ -724,15 +649,15 @@ export const deleteExtraFormByParticipantId = async (req, res) => {
         where: { extraFormId: extraForm.id },
       });
 
-      await tx.extraForm.delete({
-        where: { id: extraForm.id },
-      });
-
       if (extraForm.disability) {
         await tx.disability.delete({
           where: { id: extraForm.disability.id },
         });
       }
+
+      await tx.extraForm.delete({
+        where: { id: extraForm.id },
+      });
     });
 
     return res.json({
@@ -745,10 +670,10 @@ export const deleteExtraFormByParticipantId = async (req, res) => {
     });
   }
 };
+
 export const deleteDisabilityByParticipantId = async (req, res) => {
   try {
-    let { participantId } = req.params;
-    participantId = Number(participantId);
+    const { participantId } = req.validatedParams;
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },
@@ -767,17 +692,8 @@ export const deleteDisabilityByParticipantId = async (req, res) => {
       });
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.extraForm.update({
-        where: { id: participant.extraForm.id },
-        data: {
-          disabilityId: null,
-        },
-      });
-
-      await tx.disability.delete({
-        where: { id: participant.extraForm.disability.id },
-      });
+    await prisma.disability.delete({
+      where: { id: participant.extraForm.disability.id },
     });
 
     return res.json({
@@ -790,10 +706,10 @@ export const deleteDisabilityByParticipantId = async (req, res) => {
     });
   }
 };
+
 export const deleteSportById = async (req, res) => {
   try {
-    let { sportId } = req.params;
-    sportId = Number(sportId);
+    const { sportId } = req.validatedParams;
 
     const sport = await prisma.sport.findUnique({
       where: { id: sportId },
@@ -819,10 +735,10 @@ export const deleteSportById = async (req, res) => {
     });
   }
 };
+
 export const deleteAllSportsByParticipantId = async (req, res) => {
   try {
-    let { participantId } = req.params;
-    participantId = Number(participantId);
+    const { participantId } = req.validatedParams;
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },
@@ -849,10 +765,10 @@ export const deleteAllSportsByParticipantId = async (req, res) => {
     });
   }
 };
+
 export const deleteFearById = async (req, res) => {
   try {
-    let { fearId } = req.params;
-    fearId = Number(fearId);
+    const { fearId } = req.validatedParams;
 
     const fear = await prisma.fear.findUnique({
       where: { id: fearId },
@@ -878,10 +794,10 @@ export const deleteFearById = async (req, res) => {
     });
   }
 };
+
 export const deleteAllFearsByParticipantId = async (req, res) => {
   try {
-    let { participantId } = req.params;
-    participantId = Number(participantId);
+    const { participantId } = req.validatedParams;
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },
@@ -908,10 +824,10 @@ export const deleteAllFearsByParticipantId = async (req, res) => {
     });
   }
 };
+
 export const deleteCommunicationById = async (req, res) => {
   try {
-    let { communicationId } = req.params;
-    communicationId = Number(communicationId);
+    const { communicationId } = req.validatedParams;
 
     const communication = await prisma.communication.findUnique({
       where: { id: communicationId },
@@ -937,10 +853,10 @@ export const deleteCommunicationById = async (req, res) => {
     });
   }
 };
+
 export const deleteAllCommunicationByParticipantId = async (req, res) => {
   try {
-    let { participantId } = req.params;
-    participantId = Number(participantId);
+    const { participantId } = req.validatedParams;
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },
@@ -967,10 +883,10 @@ export const deleteAllCommunicationByParticipantId = async (req, res) => {
     });
   }
 };
+
 export const deleteFoodSensitivityById = async (req, res) => {
   try {
-    let { foodSensitivityId } = req.params;
-    foodSensitivityId = Number(foodSensitivityId);
+    const { foodSensitivityId } = req.validatedParams;
 
     const item = await prisma.foodSensitivity.findUnique({
       where: { id: foodSensitivityId },
@@ -996,10 +912,10 @@ export const deleteFoodSensitivityById = async (req, res) => {
     });
   }
 };
+
 export const deleteAllFoodSensitivitiesByParticipantId = async (req, res) => {
   try {
-    let { participantId } = req.params;
-    participantId = Number(participantId);
+    const { participantId } = req.validatedParams;
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },

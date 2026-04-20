@@ -6,12 +6,22 @@ import {
   updateDiscount,
   deleteDiscount,
 } from "../controllers/discount.controller.js";
+import { validate } from "../middleware/validate.middleware.js";
+import {
+  discountIdParamsSchema,
+  createDiscountBodySchema,
+  updateDiscountBodySchema,
+} from "../schemas/discount.schema.js";
 const router = express.Router();
 
 router.get("/", getDiscounts);
-router.get("/:discountId", getDiscountById);
-router.post("/", createDiscount);
-router.patch("/:discountId", updateDiscount);
-router.delete("/:discountId", deleteDiscount);
+router.post("/", validate({ body: createDiscountBodySchema }), createDiscount);
+router.get("/:discountId", validate({ params: discountIdParamsSchema }), getDiscountById);
+router.patch(
+  "/:discountId",
+  validate({ params: discountIdParamsSchema, body: updateDiscountBodySchema }),
+  updateDiscount
+);
+router.delete("/:discountId", validate({ params: discountIdParamsSchema }), deleteDiscount);
 
 export default router;

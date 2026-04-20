@@ -1,10 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { cancelExpiredPendingSignedUpsLogic } from "../services/cron.service.js";
 
-const isNonEmptyString = (value) => {
-  return typeof value === "string" && value.trim() !== "";
-};
-
 const splitAmountInTwo = (amount) => {
   const first = Number((amount / 2).toFixed(2));
   const second = Number((amount - first).toFixed(2));
@@ -107,63 +103,17 @@ const createReservationPaymentsForSingleSignedUp = async ({
   }
 };
 
-const validSignedUpStates = ["PENDING", "WAITLIST", "ACCEPTED", "CANCELLED"];
-
 export const updateSignedUpStatus = async (req, res) => {
   try {
-    const { inscriptionId, weekId } = req.params;
-    const { newState, paymentModeForNewReservation } = req.body;
-
-    const parsedInscriptionId = Number(inscriptionId);
-    const parsedWeekId = Number(weekId);
-
-    if (!Number.isInteger(parsedInscriptionId) || parsedInscriptionId <= 0) {
-      return res.status(400).json({
-        error: "inscriptionId debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (!Number.isInteger(parsedWeekId) || parsedWeekId <= 0) {
-      return res.status(400).json({
-        error: "weekId debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
-    if (!isNonEmptyString(newState)) {
-      return res.status(400).json({
-        error: "newState es obligatorio",
-      });
-    }
-
-    const validStates = ["PENDING", "WAITLIST", "ACCEPTED", "CANCELLED"];
-
-    if (!validStates.includes(newState)) {
-      return res.status(400).json({
-        error: "newState debe ser PENDING, WAITLIST, ACCEPTED o CANCELLED",
-      });
-    }
-
-    if (
-      paymentModeForNewReservation !== undefined &&
-      !["ONE_PAYMENT", "TWO_PAYMENTS"].includes(paymentModeForNewReservation)
-    ) {
-      return res.status(400).json({
-        error: "paymentModeForNewReservation debe ser ONE_PAYMENT o TWO_PAYMENTS",
-      });
-    }
+    const { inscriptionId, weekId } = req.validatedParams;
+    const { newState, paymentModeForNewReservation } = req.validatedBody;
 
     const result = await prisma.$transaction(async (tx) => {
       const currentSignedUp = await tx.signedUp.findUnique({
         where: {
           inscriptionId_weekId: {
-            inscriptionId: parsedInscriptionId,
-            weekId: parsedWeekId,
+            inscriptionId,
+            weekId,
           },
         },
         include: {
@@ -211,7 +161,6 @@ export const updateSignedUpStatus = async (req, res) => {
         );
       }
 
-      // WAITLIST -> PENDING
       if (currentState === "WAITLIST" && newState === "PENDING") {
         if (hasDisability) {
           if (currentSignedUp.week.availableDisabilityPlaces > 0) {
@@ -272,7 +221,6 @@ export const updateSignedUpStatus = async (req, res) => {
         });
       }
 
-      // PENDING -> CANCELLED
       if (currentState === "PENDING" && newState === "CANCELLED") {
         if (hasDisability) {
           await tx.week.update({
@@ -292,17 +240,11 @@ export const updateSignedUpStatus = async (req, res) => {
         }
       }
 
-      // WAITLIST -> CANCELLED
-      // no cambia plazas
-
-      // PENDING -> ACCEPTED
-      // no cambia plazas ni pagos, solo el estado
-
       await tx.signedUp.update({
         where: {
           inscriptionId_weekId: {
-            inscriptionId: parsedInscriptionId,
-            weekId: parsedWeekId,
+            inscriptionId,
+            weekId,
           },
         },
         data: {
@@ -312,7 +254,7 @@ export const updateSignedUpStatus = async (req, res) => {
 
       const updatedSignedUps = await tx.signedUp.findMany({
         where: {
-          inscriptionId: parsedInscriptionId,
+          inscriptionId,
         },
         orderBy: {
           createdAt: "asc",
@@ -321,17 +263,17 @@ export const updateSignedUpStatus = async (req, res) => {
 
       const newGlobalStatus = getGlobalInscriptionStatus(
         updatedSignedUps.map((item) => item.state)
-      );    
+      );
 
       await tx.inscription.update({
-        where: { id: parsedInscriptionId },
+        where: { id: inscriptionId },
         data: {
           globalStatus: newGlobalStatus,
         },
       });
 
       return tx.inscription.findUnique({
-        where: { id: parsedInscriptionId },
+        where: { id: inscriptionId },
         include: {
           participant: true,
           signedUpWeeks: {
@@ -373,7 +315,7 @@ export const updateSignedUpStatus = async (req, res) => {
 
 export const getSignedUpsByWeek = async (req, res) => {
   try {
-    const { weekId } = req.params;
+    const { weekId } = req.validatedParams;
     const {
       state,
       breakfast,
@@ -382,27 +324,11 @@ export const getSignedUpsByWeek = async (req, res) => {
       hasDisability,
       accepted,
       waitlist,
-    } = req.query;
-
-    const parsedWeekId = Number(weekId);
-
-    if (!Number.isInteger(parsedWeekId) || parsedWeekId <= 0) {
-      return res.status(400).json({
-        error: "weekId inválido",
-      });
-    }
-
-    const validStates = ["PENDING", "WAITLIST", "ACCEPTED", "CANCELLED"];
-
-    if (state !== undefined && !validStates.includes(state)) {
-      return res.status(400).json({
-        error: "state debe ser PENDING, WAITLIST, ACCEPTED o CANCELLED",
-      });
-    }
+    } = req.validatedQuery;
 
     const signedUps = await prisma.signedUp.findMany({
       where: {
-        weekId: parsedWeekId,
+        weekId,
       },
       include: {
         inscription: {
@@ -425,30 +351,30 @@ export const getSignedUpsByWeek = async (req, res) => {
         return false;
       }
 
-      if (breakfast !== undefined && String(s.breakfast) !== breakfast) {
+      if (breakfast !== undefined && s.breakfast !== breakfast) {
         return false;
       }
 
-      if (lunch !== undefined && String(s.lunch) !== lunch) {
+      if (lunch !== undefined && s.lunch !== lunch) {
         return false;
       }
 
-      if (earlyRise !== undefined && String(s.earlyRise) !== earlyRise) {
+      if (earlyRise !== undefined && s.earlyRise !== earlyRise) {
         return false;
       }
 
       if (
         hasDisability !== undefined &&
-        String(s.inscription.participant.hasDisability) !== hasDisability
+        s.inscription.participant.hasDisability !== hasDisability
       ) {
         return false;
       }
 
-      if (accepted === "true" && s.state !== "ACCEPTED") {
+      if (accepted === true && s.state !== "ACCEPTED") {
         return false;
       }
 
-      if (waitlist === "true" && s.state !== "WAITLIST") {
+      if (waitlist === true && s.state !== "WAITLIST") {
         return false;
       }
 
@@ -464,18 +390,10 @@ export const getSignedUpsByWeek = async (req, res) => {
 
 export const getWeekWaitlist = async (req, res) => {
   try {
-    const { weekId } = req.params;
-
-    const parsedWeekId = Number(weekId);
-
-    if (!Number.isInteger(parsedWeekId) || parsedWeekId <= 0) {
-      return res.status(400).json({
-        error: "weekId debe ser un número entero mayor que 0",
-      });
-    }
+    const { weekId } = req.validatedParams;
 
     const week = await prisma.week.findUnique({
-      where: { id: parsedWeekId },
+      where: { id: weekId },
       include: {
         summerCamp: true,
       },
@@ -489,7 +407,7 @@ export const getWeekWaitlist = async (req, res) => {
 
     const waitlist = await prisma.signedUp.findMany({
       where: {
-        weekId: parsedWeekId,
+        weekId,
         state: "WAITLIST",
       },
       orderBy: {

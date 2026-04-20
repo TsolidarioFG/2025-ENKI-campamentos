@@ -2,50 +2,9 @@ import prisma from "../lib/prisma.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const parsePositiveInt = (value) => {
-  if (value === undefined || value === null || value === "") return null;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-};
-
-const parseNonNegativeInt = (value) => {
-  if (value === undefined || value === null || value === "") return null;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) return null;
-  return parsed;
-};
-
-const parseNonNegativeNumber = (value) => {
-  if (value === undefined || value === null || value === "") return null;
-  const parsed = Number(value);
-  if (Number.isNaN(parsed) || parsed < 0) return null;
-  return parsed;
-};
-
-const parseBooleanStrict = (value) => {
-  if (typeof value === "boolean") return value;
-  return null;
-};
-
-const parseDateOrNull = (value) => {
-  if (value === undefined) return undefined;
-  if (value === null || value === "") return null;
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "INVALID_DATE";
-  return parsed;
-};
-
 const startOfDay = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  return d;
-};
-
-const endOfDay = (date) => {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
   return d;
 };
 
@@ -53,12 +12,6 @@ const addDays = (date, days) => {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
-};
-
-const diffDaysInclusive = (startDate, endDate) => {
-  const start = startOfDay(startDate);
-  const end = startOfDay(endDate);
-  return Math.floor((end - start) / MS_PER_DAY) + 1;
 };
 
 const computeWeekRanges = (startDate, endDate) => {
@@ -88,49 +41,6 @@ const computeWeekRanges = (startDate, endDate) => {
   return ranges;
 };
 
-const validatePriceDefaults = (priceDefaults) => {
-  if (!priceDefaults || typeof priceDefaults !== "object") {
-    return "priceDefaults es obligatorio";
-  }
-
-  const parsed = {
-    basePrice: parseNonNegativeNumber(priceDefaults.basePrice),
-    disabilityPrice: parseNonNegativeNumber(priceDefaults.disabilityPrice),
-    earlyRisePrice: parseNonNegativeNumber(priceDefaults.earlyRisePrice),
-    breakfastPrice: parseNonNegativeNumber(priceDefaults.breakfastPrice),
-    lunchPrice: parseNonNegativeNumber(priceDefaults.lunchPrice),
-  };
-
-  if (parsed.basePrice === null) return "basePrice debe ser un número mayor o igual que 0";
-  if (parsed.disabilityPrice === null) return "disabilityPrice debe ser un número mayor o igual que 0";
-  if (parsed.earlyRisePrice === null) return "earlyRisePrice debe ser un número mayor o igual que 0";
-  if (parsed.breakfastPrice === null) return "breakfastPrice debe ser un número mayor o igual que 0";
-  if (parsed.lunchPrice === null) return "lunchPrice debe ser un número mayor o igual que 0";
-
-  return parsed;
-};
-
-const validateWeekDefaults = (weekDefaults) => {
-  if (!weekDefaults || typeof weekDefaults !== "object") {
-    return "weekDefaults es obligatorio";
-  }
-
-  const parsed = {
-    totalPlaces: parseNonNegativeInt(weekDefaults.totalPlaces),
-    totalDisabilityPlaces: parseNonNegativeInt(weekDefaults.totalDisabilityPlaces),
-  };
-
-  if (parsed.totalPlaces === null) {
-    return "totalPlaces debe ser un número entero mayor o igual que 0";
-  }
-
-  if (parsed.totalDisabilityPlaces === null) {
-    return "totalDisabilityPlaces debe ser un número entero mayor o igual que 0";
-  }
-
-  return parsed;
-};
-
 export const getSummerCamps = async (req, res) => {
   try {
     const camps = await prisma.summerCamp.findMany({
@@ -155,7 +65,7 @@ export const getSummerCamps = async (req, res) => {
 
 export const getSummerCamp = async (req, res) => {
   try {
-    const { name, year } = req.query;
+    const { name, year } = req.validatedQuery;
 
     const where = {};
 
@@ -167,13 +77,7 @@ export const getSummerCamp = async (req, res) => {
     }
 
     if (year !== undefined) {
-      const parsedYear = parsePositiveInt(year);
-      if (parsedYear === null) {
-        return res.status(400).json({
-          error: "year debe ser un número entero mayor que 0",
-        });
-      }
-      where.year = parsedYear;
+      where.year = year;
     }
 
     const camps = await prisma.summerCamp.findMany({
@@ -199,12 +103,6 @@ export const getSummerCamp = async (req, res) => {
 
 export const createSummerCamp = async (req, res) => {
   try {
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
     const {
       name,
       place,
@@ -214,121 +112,13 @@ export const createSummerCamp = async (req, res) => {
       endDate,
       inscriptionOpenDate,
       inscriptionCloseDate,
-      formEnabled,
-      isActive,
+      formEnabled = true,
+      isActive = true,
       weekDefaults,
       priceDefaults,
-    } = req.body;
+    } = req.validatedBody;
 
-    if (
-      !name ||
-      !place ||
-      year === undefined ||
-      startDate === undefined ||
-      endDate === undefined ||
-      weekDefaults === undefined ||
-      priceDefaults === undefined
-    ) {
-      return res.status(400).json({
-        error:
-          "name, place, year, startDate, endDate, weekDefaults y priceDefaults son obligatorios",
-      });
-    }
-
-    if (typeof name !== "string" || !name.trim()) {
-      return res.status(400).json({ error: "name debe ser un texto no vacío" });
-    }
-
-    if (typeof place !== "string" || !place.trim()) {
-      return res.status(400).json({ error: "place debe ser un texto no vacío" });
-    }
-
-    const parsedYear = parsePositiveInt(year);
-    if (parsedYear === null) {
-      return res.status(400).json({
-        error: "year debe ser un número entero mayor que 0",
-      });
-    }
-
-    const parsedStartDate = parseDateOrNull(startDate);
-    const parsedEndDate = parseDateOrNull(endDate);
-    const parsedInscriptionOpenDate = parseDateOrNull(inscriptionOpenDate);
-    const parsedInscriptionCloseDate = parseDateOrNull(inscriptionCloseDate);
-
-    if (parsedStartDate === "INVALID_DATE") {
-      return res.status(400).json({ error: "startDate no es una fecha válida" });
-    }
-
-    if (parsedEndDate === "INVALID_DATE") {
-      return res.status(400).json({ error: "endDate no es una fecha válida" });
-    }
-
-    if (parsedInscriptionOpenDate === "INVALID_DATE") {
-      return res.status(400).json({
-        error: "inscriptionOpenDate no es una fecha válida",
-      });
-    }
-
-    if (parsedInscriptionCloseDate === "INVALID_DATE") {
-      return res.status(400).json({
-        error: "inscriptionCloseDate no es una fecha válida",
-      });
-    }
-
-    if (!parsedStartDate || !parsedEndDate) {
-      return res.status(400).json({
-        error: "startDate y endDate no pueden ser nulos",
-      });
-    }
-
-    if (parsedEndDate <= parsedStartDate) {
-      return res.status(400).json({
-        error: "endDate debe ser posterior a startDate",
-      });
-    }
-
-    if (
-      parsedInscriptionOpenDate &&
-      parsedInscriptionCloseDate &&
-      parsedInscriptionCloseDate <= parsedInscriptionOpenDate
-    ) {
-      return res.status(400).json({
-        error: "inscriptionCloseDate debe ser posterior a inscriptionOpenDate",
-      });
-    }
-
-    if (
-      parsedInscriptionCloseDate &&
-      parsedInscriptionCloseDate > parsedStartDate
-    ) {
-      return res.status(400).json({
-        error: "inscriptionCloseDate no puede ser posterior al inicio del campamento",
-      });
-    }
-
-    const validatedWeekDefaults = validateWeekDefaults(weekDefaults);
-    if (typeof validatedWeekDefaults === "string") {
-      return res.status(400).json({ error: validatedWeekDefaults });
-    }
-
-    const validatedPriceDefaults = validatePriceDefaults(priceDefaults);
-    if (typeof validatedPriceDefaults === "string") {
-      return res.status(400).json({ error: validatedPriceDefaults });
-    }
-
-    const parsedFormEnabled =
-      formEnabled !== undefined ? parseBooleanStrict(formEnabled) : true;
-    if (formEnabled !== undefined && parsedFormEnabled === null) {
-      return res.status(400).json({ error: "formEnabled debe ser booleano" });
-    }
-
-    const parsedIsActive =
-      isActive !== undefined ? parseBooleanStrict(isActive) : true;
-    if (isActive !== undefined && parsedIsActive === null) {
-      return res.status(400).json({ error: "isActive debe ser booleano" });
-    }
-
-    const weekRanges = computeWeekRanges(parsedStartDate, parsedEndDate);
+    const weekRanges = computeWeekRanges(startDate, endDate);
 
     if (weekRanges.length === 0) {
       return res.status(400).json({
@@ -337,26 +127,25 @@ export const createSummerCamp = async (req, res) => {
     }
 
     const createdCamp = await prisma.$transaction(async (tx) => {
-     const camp = await tx.summerCamp.create({
+      const camp = await tx.summerCamp.create({
         data: {
-          name: name.trim(),
-          place: place.trim(),
-          year: parsedYear,
+          name,
+          place,
+          year,
           description: description || null,
-          startDate: parsedStartDate,
-          endDate: parsedEndDate,
-          inscriptionOpenDate: parsedInscriptionOpenDate ?? null,
-          inscriptionCloseDate: parsedInscriptionCloseDate ?? null,
-          formEnabled: parsedFormEnabled,
-          isActive: parsedIsActive,
-
-          defaultTotalPlaces: validatedWeekDefaults.totalPlaces,
-          defaultTotalDisabilityPlaces: validatedWeekDefaults.totalDisabilityPlaces,
-          defaultBasePrice: validatedPriceDefaults.basePrice,
-          defaultDisabilityPrice: validatedPriceDefaults.disabilityPrice,
-          defaultEarlyRisePrice: validatedPriceDefaults.earlyRisePrice,
-          defaultBreakfastPrice: validatedPriceDefaults.breakfastPrice,
-          defaultLunchPrice: validatedPriceDefaults.lunchPrice,
+          startDate,
+          endDate,
+          inscriptionOpenDate: inscriptionOpenDate ?? null,
+          inscriptionCloseDate: inscriptionCloseDate ?? null,
+          formEnabled,
+          isActive,
+          defaultTotalPlaces: weekDefaults.totalPlaces,
+          defaultTotalDisabilityPlaces: weekDefaults.totalDisabilityPlaces,
+          defaultBasePrice: priceDefaults.basePrice,
+          defaultDisabilityPrice: priceDefaults.disabilityPrice,
+          defaultEarlyRisePrice: priceDefaults.earlyRisePrice,
+          defaultBreakfastPrice: priceDefaults.breakfastPrice,
+          defaultLunchPrice: priceDefaults.lunchPrice,
         },
       });
 
@@ -366,11 +155,10 @@ export const createSummerCamp = async (req, res) => {
             number: weekRange.number,
             startDate: weekRange.startDate,
             endDate: weekRange.endDate,
-            totalPlaces: validatedWeekDefaults.totalPlaces,
-            availablePlaces: validatedWeekDefaults.totalPlaces,
-            totalDisabilityPlaces: validatedWeekDefaults.totalDisabilityPlaces,
-            availableDisabilityPlaces:
-              validatedWeekDefaults.totalDisabilityPlaces,
+            totalPlaces: weekDefaults.totalPlaces,
+            availablePlaces: weekDefaults.totalPlaces,
+            totalDisabilityPlaces: weekDefaults.totalDisabilityPlaces,
+            availableDisabilityPlaces: weekDefaults.totalDisabilityPlaces,
             active: true,
             summerCampId: camp.id,
           },
@@ -378,11 +166,11 @@ export const createSummerCamp = async (req, res) => {
 
         await tx.price.create({
           data: {
-            basePrice: validatedPriceDefaults.basePrice,
-            disabilityPrice: validatedPriceDefaults.disabilityPrice,
-            earlyRisePrice: validatedPriceDefaults.earlyRisePrice,
-            breakfastPrice: validatedPriceDefaults.breakfastPrice,
-            lunchPrice: validatedPriceDefaults.lunchPrice,
+            basePrice: priceDefaults.basePrice,
+            disabilityPrice: priceDefaults.disabilityPrice,
+            earlyRisePrice: priceDefaults.earlyRisePrice,
+            breakfastPrice: priceDefaults.breakfastPrice,
+            lunchPrice: priceDefaults.lunchPrice,
             isActive: true,
             validFrom: new Date(),
             validTo: null,
@@ -416,29 +204,24 @@ export const createSummerCamp = async (req, res) => {
 
 export const updateSummerCamp = async (req, res) => {
   try {
-    const { id } = req.params;
-    const parsedId = parsePositiveInt(id);
-
-    if (parsedId === null) {
-      return res.status(400).json({
-        error: "id debe ser un número entero mayor que 0",
-      });
-    }
-
-    if (!req.body) {
-      return res.status(400).json({
-        error: "La petición no contiene body en formato JSON",
-      });
-    }
-
-    if (req.body.id !== undefined || req.body.createdAt !== undefined) {
-      return res.status(400).json({
-        error: "No se pueden modificar id ni createdAt",
-      });
-    }
+    const { id } = req.validatedParams;
+    const {
+      name,
+      place,
+      year,
+      description,
+      startDate,
+      endDate,
+      inscriptionOpenDate,
+      inscriptionCloseDate,
+      formEnabled,
+      isActive,
+      weekDefaults,
+      priceDefaults,
+    } = req.validatedBody;
 
     const existingCamp = await prisma.summerCamp.findUnique({
-      where: { id: parsedId },
+      where: { id },
       include: {
         weeks: {
           orderBy: {
@@ -466,159 +249,15 @@ export const updateSummerCamp = async (req, res) => {
       (week) => week.signedUpWeeks.length > 0
     );
 
-    const {
-      name,
-      place,
-      year,
-      description,
-      startDate,
-      endDate,
-      inscriptionOpenDate,
-      inscriptionCloseDate,
-      formEnabled,
-      isActive,
-      weekDefaults,
-      priceDefaults,
-    } = req.body;
+    const finalStartDate = startDate !== undefined ? startDate : existingCamp.startDate;
+    const finalEndDate = endDate !== undefined ? endDate : existingCamp.endDate;
 
-    const parsedStartDate = parseDateOrNull(startDate);
-    const parsedEndDate = parseDateOrNull(endDate);
-    const parsedInscriptionOpenDate = parseDateOrNull(inscriptionOpenDate);
-    const parsedInscriptionCloseDate = parseDateOrNull(inscriptionCloseDate);
-
-    if (parsedStartDate === "INVALID_DATE") {
-      return res.status(400).json({
-        error: "startDate no es una fecha válida",
-      });
-    }
-
-    if (parsedEndDate === "INVALID_DATE") {
-      return res.status(400).json({
-        error: "endDate no es una fecha válida",
-      });
-    }
-
-    if (parsedInscriptionOpenDate === "INVALID_DATE") {
-      return res.status(400).json({
-        error: "inscriptionOpenDate no es una fecha válida",
-      });
-    }
-
-    if (parsedInscriptionCloseDate === "INVALID_DATE") {
-      return res.status(400).json({
-        error: "inscriptionCloseDate no es una fecha válida",
-      });
-    }
-
-    const finalStartDate =
-      parsedStartDate !== undefined ? parsedStartDate : existingCamp.startDate;
-    const finalEndDate =
-      parsedEndDate !== undefined ? parsedEndDate : existingCamp.endDate;
-    const finalInscriptionOpenDate =
-      parsedInscriptionOpenDate !== undefined
-        ? parsedInscriptionOpenDate
-        : existingCamp.inscriptionOpenDate;
-    const finalInscriptionCloseDate =
-      parsedInscriptionCloseDate !== undefined
-        ? parsedInscriptionCloseDate
-        : existingCamp.inscriptionCloseDate;
-
-    if (!finalStartDate || !finalEndDate) {
-      return res.status(400).json({
-        error: "El campamento debe tener startDate y endDate",
-      });
-    }
-
-    if (finalEndDate <= finalStartDate) {
-      return res.status(400).json({
-        error: "endDate debe ser posterior a startDate",
-      });
-    }
-
-    if (
-      finalInscriptionOpenDate &&
-      finalInscriptionCloseDate &&
-      finalInscriptionCloseDate <= finalInscriptionOpenDate
-    ) {
-      return res.status(400).json({
-        error: "inscriptionCloseDate debe ser posterior a inscriptionOpenDate",
-      });
-    }
-
-    if (
-      finalInscriptionCloseDate &&
-      finalInscriptionCloseDate > finalStartDate
-    ) {
-      return res.status(400).json({
-        error: "inscriptionCloseDate no puede ser posterior al inicio del campamento",
-      });
-    }
-
-    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
-      return res.status(400).json({
-        error: "name debe ser un texto no vacío",
-      });
-    }
-
-    if (place !== undefined && (typeof place !== "string" || !place.trim())) {
-      return res.status(400).json({
-        error: "place debe ser un texto no vacío",
-      });
-    }
-
-    let parsedYear = existingCamp.year;
-    if (year !== undefined) {
-      parsedYear = parsePositiveInt(year);
-      if (parsedYear === null) {
-        return res.status(400).json({
-          error: "year debe ser un número entero mayor que 0",
-        });
-      }
-    }
-
-    let parsedFormEnabled;
-    if (formEnabled !== undefined) {
-      parsedFormEnabled = parseBooleanStrict(formEnabled);
-      if (parsedFormEnabled === null) {
-        return res.status(400).json({
-          error: "formEnabled debe ser booleano",
-        });
-      }
-    }
-
-    let parsedIsActive;
-    if (isActive !== undefined) {
-      parsedIsActive = parseBooleanStrict(isActive);
-      if (parsedIsActive === null) {
-        return res.status(400).json({
-          error: "isActive debe ser booleano",
-        });
-      }
-    }
-
-    let validatedWeekDefaults;
-    if (weekDefaults !== undefined) {
-      validatedWeekDefaults = validateWeekDefaults(weekDefaults);
-      if (typeof validatedWeekDefaults === "string") {
-        return res.status(400).json({ error: validatedWeekDefaults });
-      }
-    }
-
-    let validatedPriceDefaults;
-    if (priceDefaults !== undefined) {
-      validatedPriceDefaults = validatePriceDefaults(priceDefaults);
-      if (typeof validatedPriceDefaults === "string") {
-        return res.status(400).json({ error: validatedPriceDefaults });
-      }
-    }
-
-    const datesChanged =
-      startDate !== undefined || endDate !== undefined;
+    const datesChanged = startDate !== undefined || endDate !== undefined;
 
     if (datesChanged && hasAnyInscriptions) {
       if (
-        parsedStartDate !== undefined &&
-        parsedStartDate.getTime() !== new Date(existingCamp.startDate).getTime()
+        startDate !== undefined &&
+        new Date(startDate).getTime() !== new Date(existingCamp.startDate).getTime()
       ) {
         return res.status(409).json({
           error:
@@ -627,8 +266,8 @@ export const updateSummerCamp = async (req, res) => {
       }
 
       if (
-        parsedEndDate !== undefined &&
-        parsedEndDate < new Date(existingCamp.endDate)
+        endDate !== undefined &&
+        new Date(endDate) < new Date(existingCamp.endDate)
       ) {
         return res.status(409).json({
           error:
@@ -639,42 +278,39 @@ export const updateSummerCamp = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       await tx.summerCamp.update({
-        where: { id: parsedId },
+        where: { id },
         data: {
-          ...(name !== undefined && { name: name.trim() }),
-          ...(place !== undefined && { place: place.trim() }),
-          ...(year !== undefined && { year: parsedYear }),
+          ...(name !== undefined && { name }),
+          ...(place !== undefined && { place }),
+          ...(year !== undefined && { year }),
           ...(description !== undefined && { description: description || null }),
-          ...(startDate !== undefined && { startDate: parsedStartDate }),
-          ...(endDate !== undefined && { endDate: parsedEndDate }),
+          ...(startDate !== undefined && { startDate }),
+          ...(endDate !== undefined && { endDate }),
           ...(inscriptionOpenDate !== undefined && {
-            inscriptionOpenDate: parsedInscriptionOpenDate,
+            inscriptionOpenDate,
           }),
           ...(inscriptionCloseDate !== undefined && {
-            inscriptionCloseDate: parsedInscriptionCloseDate,
+            inscriptionCloseDate,
           }),
-          ...(formEnabled !== undefined && { formEnabled: parsedFormEnabled }),
-          ...(isActive !== undefined && { isActive: parsedIsActive }),
-
-          ...(validatedWeekDefaults && {
-            defaultTotalPlaces: validatedWeekDefaults.totalPlaces,
-            defaultTotalDisabilityPlaces:
-              validatedWeekDefaults.totalDisabilityPlaces,
+          ...(formEnabled !== undefined && { formEnabled }),
+          ...(isActive !== undefined && { isActive }),
+          ...(weekDefaults && {
+            defaultTotalPlaces: weekDefaults.totalPlaces,
+            defaultTotalDisabilityPlaces: weekDefaults.totalDisabilityPlaces,
           }),
-
-          ...(validatedPriceDefaults && {
-            defaultBasePrice: validatedPriceDefaults.basePrice,
-            defaultDisabilityPrice: validatedPriceDefaults.disabilityPrice,
-            defaultEarlyRisePrice: validatedPriceDefaults.earlyRisePrice,
-            defaultBreakfastPrice: validatedPriceDefaults.breakfastPrice,
-            defaultLunchPrice: validatedPriceDefaults.lunchPrice,
+          ...(priceDefaults && {
+            defaultBasePrice: priceDefaults.basePrice,
+            defaultDisabilityPrice: priceDefaults.disabilityPrice,
+            defaultEarlyRisePrice: priceDefaults.earlyRisePrice,
+            defaultBreakfastPrice: priceDefaults.breakfastPrice,
+            defaultLunchPrice: priceDefaults.lunchPrice,
           }),
         },
       });
 
       if (!datesChanged) {
         return tx.summerCamp.findUnique({
-          where: { id: parsedId },
+          where: { id },
           include: {
             weeks: {
               orderBy: { number: "asc" },
@@ -686,7 +322,6 @@ export const updateSummerCamp = async (req, res) => {
 
       const newRanges = computeWeekRanges(finalStartDate, finalEndDate);
 
-      // CASO 1: no hay inscripciones -> regenerar todo
       if (!hasAnyInscriptions) {
         const oldWeekIds = existingCamp.weeks.map((w) => w.id);
 
@@ -699,20 +334,19 @@ export const updateSummerCamp = async (req, res) => {
 
           await tx.week.deleteMany({
             where: {
-              summerCampId: parsedId,
+              summerCampId: id,
             },
           });
         }
 
         const finalWeekDefaults =
-          validatedWeekDefaults ?? {
+          weekDefaults ?? {
             totalPlaces: existingCamp.defaultTotalPlaces,
-            totalDisabilityPlaces:
-              existingCamp.defaultTotalDisabilityPlaces,
+            totalDisabilityPlaces: existingCamp.defaultTotalDisabilityPlaces,
           };
 
         const finalPriceDefaults =
-          validatedPriceDefaults ?? {
+          priceDefaults ?? {
             basePrice: existingCamp.defaultBasePrice,
             disabilityPrice: existingCamp.defaultDisabilityPrice,
             earlyRisePrice: existingCamp.defaultEarlyRisePrice,
@@ -732,7 +366,7 @@ export const updateSummerCamp = async (req, res) => {
               availableDisabilityPlaces:
                 finalWeekDefaults.totalDisabilityPlaces,
               active: true,
-              summerCampId: parsedId,
+              summerCampId: id,
             },
           });
 
@@ -752,7 +386,6 @@ export const updateSummerCamp = async (req, res) => {
           });
         }
       } else {
-        // CASO 2: sí hay inscripciones -> solo ampliar por el final
         const oldWeeks = existingCamp.weeks;
         const oldLastWeek = oldWeeks[oldWeeks.length - 1];
         const oldCampEndDate = new Date(existingCamp.endDate);
@@ -764,7 +397,7 @@ export const updateSummerCamp = async (req, res) => {
           const currentLastWeekLength =
             Math.floor(
               (new Date(oldLastWeek.endDate) - new Date(oldLastWeek.startDate)) /
-                (24 * 60 * 60 * 1000)
+                MS_PER_DAY
             ) + 1;
 
           let remainingDaysToFillLastWeek = 7 - currentLastWeekLength;
@@ -772,9 +405,7 @@ export const updateSummerCamp = async (req, res) => {
           if (remainingDaysToFillLastWeek > 0 && cursorDate <= requestedEndDate) {
             const maxExtraDays = Math.min(
               remainingDaysToFillLastWeek,
-              Math.floor(
-                (requestedEndDate - cursorDate) / (24 * 60 * 60 * 1000)
-              ) + 1
+              Math.floor((requestedEndDate - cursorDate) / MS_PER_DAY) + 1
             );
 
             const newLastWeekEndDate = addDays(oldLastWeek.endDate, maxExtraDays);
@@ -790,14 +421,14 @@ export const updateSummerCamp = async (req, res) => {
           }
 
           const defaultWeekValues =
-            validatedWeekDefaults ?? {
+            weekDefaults ?? {
               totalPlaces: existingCamp.defaultTotalPlaces,
               totalDisabilityPlaces:
                 existingCamp.defaultTotalDisabilityPlaces,
             };
 
           const defaultPriceValues =
-            validatedPriceDefaults ?? {
+            priceDefaults ?? {
               basePrice: existingCamp.defaultBasePrice,
               disabilityPrice: existingCamp.defaultDisabilityPrice,
               earlyRisePrice: existingCamp.defaultEarlyRisePrice,
@@ -824,7 +455,7 @@ export const updateSummerCamp = async (req, res) => {
                 availableDisabilityPlaces:
                   defaultWeekValues.totalDisabilityPlaces,
                 active: true,
-                summerCampId: parsedId,
+                summerCampId: id,
               },
             });
 
@@ -850,7 +481,7 @@ export const updateSummerCamp = async (req, res) => {
       }
 
       return tx.summerCamp.findUnique({
-        where: { id: parsedId },
+        where: { id },
         include: {
           weeks: {
             orderBy: { number: "asc" },
@@ -871,17 +502,10 @@ export const updateSummerCamp = async (req, res) => {
 
 export const deleteSummerCamp = async (req, res) => {
   try {
-    const { id } = req.params;
-    const parsedId = parsePositiveInt(id);
-
-    if (parsedId === null) {
-      return res.status(400).json({
-        error: "id debe ser un número entero mayor que 0",
-      });
-    }
+    const { id } = req.validatedParams;
 
     const existingCamp = await prisma.summerCamp.findUnique({
-      where: { id: parsedId },
+      where: { id },
       include: {
         importantDates: true,
         weeks: {
@@ -914,7 +538,7 @@ export const deleteSummerCamp = async (req, res) => {
 
       if (existingCamp.importantDates.length > 0) {
         await tx.importantDate.deleteMany({
-          where: { summerCampId: parsedId },
+          where: { summerCampId: id },
         });
       }
 
@@ -927,13 +551,13 @@ export const deleteSummerCamp = async (req, res) => {
 
         await tx.week.deleteMany({
           where: {
-            summerCampId: parsedId,
+            summerCampId: id,
           },
         });
       }
 
       await tx.summerCamp.delete({
-        where: { id: parsedId },
+        where: { id },
       });
     });
 
