@@ -1,24 +1,39 @@
+@import "./styles/fonts.css";
+
 :root {
   --enki-green: #289548;
   --enki-blue: #009de0;
   --enki-pink: #c83486;
   --enki-yellow: #f9dc0a;
   --enki-purple: #5a3888;
+
+  --color-primary: #F28C28;
+  --color-secondary: #3D3D3D;
+  --color-background: #FFFDF8;
+  --color-text: #222222;
+
   --black: #000000;
   --white: #ffffff;
   --gray: #f4f4f4;
-
-  font-family: system-ui, Arial, sans-serif;
-  color: var(--black);
-  background: var(--white);
 }
 
 * {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  margin: 0;
+  font-family: "Labil", sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+h1,
+h2,
+h3,
+.logo-text {
+  font-family: "Totally", sans-serif;
 }
 
 button,
@@ -32,4 +47,31 @@ textarea {
   max-width: 1100px;
   margin: 0 auto;
   padding: 32px;
+}
+.navbar {
+  width: 100%;
+  padding: 18px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--enki-yellow);
+  border-bottom: 4px solid var(--black);
+}
+
+.navbar-logo {
+  font-family: "Totally", sans-serif;
+  font-size: 28px;
+  color: var(--black);
+  text-decoration: none;
+}
+
+.navbar-links {
+  display: flex;
+  gap: 20px;
+}
+
+.navbar-links a {
+  color: var(--black);
+  text-decoration: none;
+  font-weight: 700;
 }

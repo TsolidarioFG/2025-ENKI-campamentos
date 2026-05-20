@@ -1,0 +1,10 @@
+@font-face {
+  font-family: "Totally";
+  src: url("../assets/fonts/Totally-Heavy.otf") format("opentype");
+}
+
+
+@font-face {
+  font-family: LabilRegular;
+  src: url(../assets/fonts/LabilGrotesk-Regular.woff2);
+}
