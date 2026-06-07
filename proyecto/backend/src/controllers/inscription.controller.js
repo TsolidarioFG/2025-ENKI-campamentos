@@ -1,6 +1,5 @@
 import prisma from "../lib/prisma.js";
 import {
-  extractManualDiscountRequests,
   resolveApplicableDiscountsForCreation,
   createInscriptionDiscountRows,
   applyDiscountsToAmount,
@@ -30,6 +29,36 @@ const splitAmountInTwo = (amount) => {
   return [first, second];
 };
 
+const validateSummerCampForPublicInscription = (summerCamp) => {
+  if (!summerCamp) {
+    throw new Error("Campamento no encontrado");
+  }
+
+  if (!summerCamp.isActive) {
+    throw new Error("El campamento está inactivo");
+  }
+
+  if (!summerCamp.formEnabled) {
+    throw new Error("El formulario de inscripción no está disponible actualmente");
+  }
+
+  const now = new Date();
+
+  if (
+    summerCamp.inscriptionOpenDate &&
+    now < new Date(summerCamp.inscriptionOpenDate)
+  ) {
+    throw new Error("El periodo de inscripción todavía no está abierto");
+  }
+
+  if (
+    summerCamp.inscriptionCloseDate &&
+    now > new Date(summerCamp.inscriptionCloseDate)
+  ) {
+    throw new Error("El periodo de inscripción ya está cerrado");
+  }
+};
+
 const createReservationPaymentsForSignedUps = async ({
   tx,
   inscriptionId,
@@ -44,7 +73,10 @@ const createReservationPaymentsForSignedUps = async ({
   }
 
   if (paymentMode === "ONE_PAYMENT") {
-    const total = pendingSignedUps.reduce((sum, item) => sum + item.priceApplied, 0);
+    const total = pendingSignedUps.reduce(
+      (sum, item) => sum + Number(item.priceApplied || 0),
+      0
+    );
 
     const payment = await tx.payment.create({
       data: {
@@ -77,7 +109,7 @@ const createReservationPaymentsForSignedUps = async ({
     const secondAmounts = [];
 
     for (const item of pendingSignedUps) {
-      const [first, second] = splitAmountInTwo(item.priceApplied);
+      const [first, second] = splitAmountInTwo(Number(item.priceApplied || 0));
       firstAmounts.push({ weekId: item.weekId, amount: first });
       secondAmounts.push({ weekId: item.weekId, amount: second });
     }
@@ -135,9 +167,14 @@ const createReservationPaymentsForSignedUps = async ({
 
 export const getInscriptions = async (req, res) => {
   try {
-    const { summerCampId, number, globalStatus, paymentMode } = req.validatedQuery;
+    const { summerCampId, number, globalStatus, paymentMode } =
+      req.validatedQuery;
 
     const where = {};
+
+    if (summerCampId !== undefined) {
+      where.summerCampId = summerCampId;
+    }
 
     if (globalStatus !== undefined) {
       where.globalStatus = globalStatus;
@@ -147,24 +184,15 @@ export const getInscriptions = async (req, res) => {
       where.paymentMode = paymentMode;
     }
 
-    if (summerCampId !== undefined || number !== undefined) {
+    if (number !== undefined) {
       where.signedUpWeeks = {
-        some: {},
+        some: {
+          week: {
+            number,
+            ...(summerCampId !== undefined && { summerCampId }),
+          },
+        },
       };
-
-      if (summerCampId !== undefined) {
-        where.signedUpWeeks.some.week = {
-          summerCampId,
-        };
-      }
-
-      if (number !== undefined) {
-        if (!where.signedUpWeeks.some.week) {
-          where.signedUpWeeks.some.week = {};
-        }
-
-        where.signedUpWeeks.some.week.number = number;
-      }
     }
 
     const inscriptions = await prisma.inscription.findMany({
@@ -173,6 +201,7 @@ export const getInscriptions = async (req, res) => {
         inscriptionDate: "desc",
       },
       include: {
+        summerCamp: true,
         participant: {
           include: {
             guardian: true,
@@ -219,6 +248,7 @@ export const getInscriptionById = async (req, res) => {
     const inscription = await prisma.inscription.findUnique({
       where: { id },
       include: {
+        summerCamp: true,
         participant: {
           include: {
             guardian: true,
@@ -279,6 +309,7 @@ export const getInscriptionById = async (req, res) => {
 export const createInscription = async (req, res) => {
   try {
     const {
+      summerCampId,
       participant,
       guardian,
       address,
@@ -288,18 +319,35 @@ export const createInscription = async (req, res) => {
       discounts = [],
     } = req.validatedBody;
 
-    const manualDiscountRequests = extractManualDiscountRequests({ discounts });
+    const manualDiscountRequests = discounts;
     const hasDisability = participant.hasDisability === true;
     const now = new Date();
 
     const result = await prisma.$transaction(async (tx) => {
+      const summerCamp = await tx.summerCamp.findUnique({
+        where: {
+          id: summerCampId,
+        },
+      });
+
+      validateSummerCampForPublicInscription(summerCamp);
+
       const validatedWeeks = [];
 
       for (const selectedWeek of weeks) {
+        if (
+          selectedWeek.summerCampId !== undefined &&
+          Number(selectedWeek.summerCampId) !== Number(summerCampId)
+        ) {
+          throw new Error(
+            "Todas las semanas deben pertenecer al campamento seleccionado"
+          );
+        }
+
         const foundWeek = await tx.week.findUnique({
           where: {
             summerCampId_number: {
-              summerCampId: selectedWeek.summerCampId,
+              summerCampId,
               number: selectedWeek.number,
             },
           },
@@ -315,41 +363,49 @@ export const createInscription = async (req, res) => {
 
         if (!foundWeek) {
           throw new Error(
-            `La semana ${selectedWeek.number} del campamento ${selectedWeek.summerCampId} no existe`
+            `La semana ${selectedWeek.number} no existe en el campamento seleccionado`
           );
         }
 
         if (!foundWeek.active) {
           throw new Error(
-            `La semana ${selectedWeek.number} del campamento ${selectedWeek.summerCampId} está inactiva`
+            `La semana ${selectedWeek.number} del campamento seleccionado está inactiva`
+          );
+        }
+
+        if (foundWeek.summerCampId !== summerCampId) {
+          throw new Error(
+            "Todas las semanas deben pertenecer al campamento seleccionado"
           );
         }
 
         if (!foundWeek.summerCamp || !foundWeek.summerCamp.isActive) {
-          throw new Error(`El campamento ${selectedWeek.summerCampId} está inactivo`);
+          throw new Error("El campamento está inactivo");
+        }
+
+        if (!foundWeek.summerCamp.formEnabled) {
+          throw new Error(
+            "El formulario de inscripción no está disponible actualmente"
+          );
         }
 
         if (
           foundWeek.summerCamp.inscriptionOpenDate &&
           now < new Date(foundWeek.summerCamp.inscriptionOpenDate)
         ) {
-          throw new Error(
-            `El periodo de inscripción del campamento ${selectedWeek.summerCampId} aún no está abierto`
-          );
+          throw new Error("El periodo de inscripción todavía no está abierto");
         }
 
         if (
           foundWeek.summerCamp.inscriptionCloseDate &&
           now > new Date(foundWeek.summerCamp.inscriptionCloseDate)
         ) {
-          throw new Error(
-            `El periodo de inscripción del campamento ${selectedWeek.summerCampId} ya está cerrado`
-          );
+          throw new Error("El periodo de inscripción ya está cerrado");
         }
 
         if (foundWeek.prices.length === 0) {
           throw new Error(
-            `La semana ${selectedWeek.number} del campamento ${selectedWeek.summerCampId} no tiene precio activo`
+            `La semana ${selectedWeek.number} del campamento seleccionado no tiene precio activo`
           );
         }
 
@@ -359,6 +415,17 @@ export const createInscription = async (req, res) => {
           activePrice: foundWeek.prices[0],
         });
       }
+
+      const participantNotes = [
+        participant.hasDisability && participant.disabilityInfo
+          ? `Información adicional sobre discapacidad: ${participant.disabilityInfo}`
+          : null,
+        participant.symptomsInfo
+          ? `Síntomas habituales: ${participant.symptomsInfo}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
       const createdParticipant = await tx.participant.create({
         data: {
@@ -370,11 +437,45 @@ export const createInscription = async (req, res) => {
           repeatedBefore: participant.repeatedBefore ?? false,
           siblings: participant.siblings ?? false,
           schoolRelated: participant.schoolRelated ?? false,
-          schoolObservations: participant.schoolObservations || null,
+          schoolObservations: null,
           hasDisability: participant.hasDisability ?? false,
-          notes: participant.notes || null,
+          notes: participantNotes || null,
         },
       });
+
+      if (participant.allergyDescription) {
+        await tx.allergy.create({
+          data: {
+            description: participant.allergyDescription,
+            participantId: createdParticipant.id,
+          },
+        });
+      }
+
+      if (participant.medicationDescription) {
+        await tx.medication.create({
+          data: {
+            description: participant.medicationDescription,
+            participantId: createdParticipant.id,
+          },
+        });
+      }
+
+      if (participant.hasDisability === true) {
+        const createdExtraForm = await tx.extraForm.create({
+          data: {
+            participantId: createdParticipant.id,
+          },
+        });
+
+        await tx.disability.create({
+          data: {
+            disabilityDegree: participant.disabilityDegree || null,
+            dependencyDegree: participant.dependencyDegree || null,
+            extraFormId: createdExtraForm.id,
+          },
+        });
+      }
 
       await tx.guardian.create({
         data: {
@@ -427,39 +528,38 @@ export const createInscription = async (req, res) => {
         const { selectedWeek, week, activePrice } = item;
 
         let grossAmount = hasDisability
-          ? activePrice.disabilityPrice
-          : activePrice.basePrice;
+          ? Number(activePrice.disabilityPrice || 0)
+          : Number(activePrice.basePrice || 0);
 
         if (selectedWeek.breakfast === true) {
-          grossAmount += activePrice.breakfastPrice;
+          grossAmount += Number(activePrice.breakfastPrice || 0);
         }
 
         if (selectedWeek.lunch === true) {
-          grossAmount += activePrice.lunchPrice;
+          grossAmount += Number(activePrice.lunchPrice || 0);
         }
 
         if (selectedWeek.earlyRise === true) {
-          grossAmount += activePrice.earlyRisePrice;
+          grossAmount += Number(activePrice.earlyRisePrice || 0);
         }
 
         const state = getInitialWeekState({ hasDisability, week });
         weekStates.push(state);
 
-        let finalAmount = grossAmount;
+        const discountResult = applyDiscountsToAmount(
+          grossAmount,
+          applicableDiscounts
+        );
+
+        const finalAmount = discountResult.finalAmount;
 
         if (state === "PENDING") {
-          const discountResult = applyDiscountsToAmount(
-            grossAmount,
-            applicableDiscounts
-          );
-
-          finalAmount = discountResult.finalAmount;
-
           if (hasDisability) {
             await tx.week.update({
               where: { id: week.id },
               data: {
-                availableDisabilityPlaces: week.availableDisabilityPlaces - 1,
+                availableDisabilityPlaces:
+                  week.availableDisabilityPlaces - 1,
               },
             });
           } else {
@@ -487,6 +587,7 @@ export const createInscription = async (req, res) => {
       const createdInscription = await tx.inscription.create({
         data: {
           inscriptionDate: now,
+          summerCampId,
           paymentMode: inscription.paymentMode,
           globalStatus: getInitialInscriptionStatus(weekStates),
           totalAmountExpected,
@@ -539,10 +640,28 @@ export const createInscription = async (req, res) => {
       return tx.inscription.findUnique({
         where: { id: createdInscription.id },
         include: {
-          participant: true,
+          summerCamp: true,
+          participant: {
+            include: {
+              guardian: true,
+              address: true,
+              authorizedPeople: true,
+              allergies: true,
+              medications: true,
+              extraForm: {
+                include: {
+                  disability: true,
+                },
+              },
+            },
+          },
           signedUpWeeks: {
             include: {
-              week: true,
+              week: {
+                include: {
+                  summerCamp: true,
+                },
+              },
               paymentAllocations: {
                 include: {
                   payment: true,
@@ -575,12 +694,15 @@ export const createInscription = async (req, res) => {
     console.error("Error al crear inscripción:", error);
 
     if (
+      error.message?.includes("no encontrado") ||
       error.message?.includes("no existe") ||
-      error.message?.includes("está inactiva") ||
-      error.message?.includes("está inactivo") ||
-      error.message?.includes("aún no está abierto") ||
+      error.message?.includes("inactiva") ||
+      error.message?.includes("inactivo") ||
+      error.message?.includes("no está disponible") ||
+      error.message?.includes("no está abierto") ||
       error.message?.includes("ya está cerrado") ||
-      error.message?.includes("no tiene precio activo")
+      error.message?.includes("no tiene precio activo") ||
+      error.message?.includes("deben pertenecer")
     ) {
       return res.status(400).json({
         error: error.message,
@@ -699,6 +821,7 @@ export const cancelInscription = async (req, res) => {
       return tx.inscription.findUnique({
         where: { id },
         include: {
+          summerCamp: true,
           participant: true,
           signedUpWeeks: {
             include: {
@@ -733,6 +856,445 @@ export const cancelInscription = async (req, res) => {
     console.error("Error al cancelar la inscripción:", error);
     res.status(500).json({
       error: error.message || "Error al cancelar la inscripción",
+    });
+  }
+};
+export const updateInscriptionDetails = async (req, res) => {
+  try {
+    const { id } = req.validatedParams;
+    const {
+      inscription,
+      participant,
+      guardian,
+      address,
+      allergies,
+      medications,
+      authorizedPeople,
+      extraForm,
+      disability,
+      sports,
+      fears,
+      communication,
+      foodSensitivities,
+    } = req.validatedBody;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existingInscription = await tx.inscription.findUnique({
+        where: { id },
+        include: {
+          participant: {
+            include: {
+              guardian: true,
+              address: true,
+            },
+          },
+        },
+      });
+      const ensureExtraForm = async () => {
+  const existingExtraForm = await tx.extraForm.findUnique({
+    where: {
+      participantId: existingInscription.participantId,
+    },
+  });
+
+  if (existingExtraForm) return existingExtraForm;
+
+  return tx.extraForm.create({
+    data: {
+      participantId: existingInscription.participantId,
+    },
+  });
+};
+      if (!existingInscription) {
+        throw new Error("La inscripción no existe");
+      }
+
+      if (inscription) {
+        await tx.inscription.update({
+          where: { id },
+          data: {
+            ...(inscription.paymentMode !== undefined && {
+              paymentMode: inscription.paymentMode,
+            }),
+            ...(inscription.invoiceRequested !== undefined && {
+              invoiceRequested: inscription.invoiceRequested,
+            }),
+            ...(inscription.invoiceIssued !== undefined && {
+              invoiceIssued: inscription.invoiceIssued,
+            }),
+            ...(inscription.invoiceName !== undefined && {
+              invoiceName: inscription.invoiceName || null,
+            }),
+            ...(inscription.invoiceDni !== undefined && {
+              invoiceDni: inscription.invoiceDni || null,
+            }),
+            ...(inscription.dataTreatmentAccepted !== undefined && {
+              dataTreatmentAccepted: inscription.dataTreatmentAccepted,
+            }),
+            ...(inscription.outingsAccepted !== undefined && {
+              outingsAccepted: inscription.outingsAccepted,
+            }),
+            ...(inscription.imagesAccepted !== undefined && {
+              imagesAccepted: inscription.imagesAccepted,
+            }),
+            ...(inscription.notes !== undefined && {
+              notes: inscription.notes || null,
+            }),
+          },
+        });
+      }
+
+      if (participant) {
+        await tx.participant.update({
+          where: { id: existingInscription.participantId },
+          data: {
+            ...(participant.name !== undefined && {
+              name: participant.name,
+            }),
+            ...(participant.surname !== undefined && {
+              surname: participant.surname,
+            }),
+            ...(participant.birthdate !== undefined && {
+              birthdate: new Date(participant.birthdate),
+            }),
+            ...(participant.gender !== undefined && {
+              gender: participant.gender || null,
+            }),
+            ...(participant.healthCard !== undefined && {
+              healthCard: participant.healthCard || null,
+            }),
+            ...(participant.repeatedBefore !== undefined && {
+              repeatedBefore: participant.repeatedBefore,
+            }),
+            ...(participant.siblings !== undefined && {
+              siblings: participant.siblings,
+            }),
+            ...(participant.schoolRelated !== undefined && {
+              schoolRelated: participant.schoolRelated,
+            }),
+            ...(participant.schoolObservations !== undefined && {
+              schoolObservations: participant.schoolObservations || null,
+            }),
+            ...(participant.hasDisability !== undefined && {
+              hasDisability: participant.hasDisability,
+            }),
+            ...(participant.notes !== undefined && {
+              notes: participant.notes || null,
+            }),
+          },
+        });
+      }
+
+      if (guardian) {
+        if (existingInscription.participant.guardian) {
+          await tx.guardian.update({
+            where: {
+              id: existingInscription.participant.guardian.id,
+            },
+            data: {
+              ...(guardian.name !== undefined && {
+                name: guardian.name,
+              }),
+              ...(guardian.surname !== undefined && {
+                surname: guardian.surname,
+              }),
+              ...(guardian.dni !== undefined && {
+                dni: guardian.dni || null,
+              }),
+              ...(guardian.phone !== undefined && {
+                phone: guardian.phone,
+              }),
+              ...(guardian.phone2 !== undefined && {
+                phone2: guardian.phone2 || null,
+              }),
+              ...(guardian.email !== undefined && {
+                email: guardian.email,
+              }),
+              ...(guardian.email2 !== undefined && {
+                email2: guardian.email2 || null,
+              }),
+              ...(guardian.relation !== undefined && {
+                relation: guardian.relation || null,
+              }),
+            },
+          });
+        } else {
+          await tx.guardian.create({
+            data: {
+              name: guardian.name || "",
+              surname: guardian.surname || "",
+              dni: guardian.dni || null,
+              phone: guardian.phone || "",
+              phone2: guardian.phone2 || null,
+              email: guardian.email || "",
+              email2: guardian.email2 || null,
+              relation: guardian.relation || null,
+              participantId: existingInscription.participantId,
+            },
+          });
+        }
+      }
+
+      if (address) {
+        if (existingInscription.participant.address) {
+          await tx.address.update({
+            where: {
+              id: existingInscription.participant.address.id,
+            },
+            data: {
+              ...(address.street !== undefined && {
+                street: address.street || null,
+              }),
+              ...(address.city !== undefined && {
+                city: address.city || null,
+              }),
+              ...(address.province !== undefined && {
+                province: address.province || null,
+              }),
+              ...(address.postalCode !== undefined && {
+                postalCode: address.postalCode || null,
+              }),
+            },
+          });
+        } else {
+          await tx.address.create({
+            data: {
+              street: address.street || null,
+              city: address.city || null,
+              province: address.province || null,
+              postalCode: address.postalCode || null,
+              participantId: existingInscription.participantId,
+            },
+          });
+        }
+      }
+      if (allergies !== undefined) {
+        await tx.allergy.deleteMany({
+          where: {
+            participantId: existingInscription.participantId,
+          },
+        });
+
+        const cleanAllergies = allergies
+          .map((item) => ({
+            description: item.description?.trim(),
+            participantId: existingInscription.participantId,
+          }))
+          .filter((item) => item.description);
+
+        if (cleanAllergies.length > 0) {
+          await tx.allergy.createMany({
+            data: cleanAllergies,
+          });
+        }
+      }
+
+      if (medications !== undefined) {
+        await tx.medication.deleteMany({
+          where: {
+            participantId: existingInscription.participantId,
+          },
+        });
+
+        const cleanMedications = medications
+          .map((item) => ({
+            description: item.description?.trim(),
+            participantId: existingInscription.participantId,
+          }))
+          .filter((item) => item.description);
+
+        if (cleanMedications.length > 0) {
+          await tx.medication.createMany({
+            data: cleanMedications,
+          });
+        }
+      }
+
+      if (authorizedPeople !== undefined) {
+        await tx.authorizedPerson.deleteMany({
+          where: {
+            participantId: existingInscription.participantId,
+          },
+        });
+
+        const cleanAuthorizedPeople = authorizedPeople
+          .map((item) => ({
+            name: item.name?.trim(),
+            surname: item.surname?.trim(),
+            dni: item.dni?.trim() || null,
+            phone: item.phone?.trim() || null,
+            relation: item.relation?.trim() || null,
+            participantId: existingInscription.participantId,
+          }))
+          .filter((item) => item.name || item.surname || item.phone || item.relation);
+
+        if (cleanAuthorizedPeople.length > 0) {
+          await tx.authorizedPerson.createMany({
+            data: cleanAuthorizedPeople,
+          });
+        }
+      }
+      if (extraForm !== undefined) {
+        const currentExtraForm = await ensureExtraForm();
+
+        await tx.extraForm.update({
+          where: {
+            id: currentExtraForm.id,
+          },
+          data: {
+            calledBefore: extraForm.calledBefore ?? null,
+            routines: extraForm.routines || null,
+            emotionalRegulation: extraForm.emotionalRegulation || null,
+            schoolingType: extraForm.schoolingType || null,
+            schoolingTypeOther:
+              extraForm.schoolingType === "OTHER"
+                ? extraForm.schoolingTypeOther || null
+                : null,
+            supportType: extraForm.supportType || null,
+            hygiene: extraForm.hygiene || null,
+            bladderControl: extraForm.bladderControl || null,
+            bowelControl: extraForm.bowelControl || null,
+            eatingSupport: extraForm.eatingSupport || null,
+            feedingAdaptation: extraForm.feedingAdaptation || null,
+            chokingEpisodes: extraForm.chokingEpisodes ?? null,
+            extraInfo: extraForm.extraInfo || null,
+          },
+        });
+      }
+      if (disability !== undefined) {
+        const currentExtraForm = await ensureExtraForm();
+
+        await tx.disability.upsert({
+          where: {
+            extraFormId: currentExtraForm.id,
+          },
+          update: {
+            functionalDiversity: disability.functionalDiversity || null,
+            disabilityDegree: disability.disabilityDegree || null,
+            dependencyDegree: disability.dependencyDegree || null,
+            wheelchair: disability.wheelchair ?? null,
+            mobilityAid: disability.mobilityAid || null,
+            walking: disability.walking || null,
+            running: disability.running || null,
+            climbing: disability.climbing || null,
+            crawling: disability.crawling || null,
+            jumping: disability.jumping || null,
+            stairs: disability.stairs || null,
+            outdoorMobility: disability.outdoorMobility || null,
+          },
+          create: {
+            extraFormId: currentExtraForm.id,
+            functionalDiversity: disability.functionalDiversity || null,
+            disabilityDegree: disability.disabilityDegree || null,
+            dependencyDegree: disability.dependencyDegree || null,
+            wheelchair: disability.wheelchair ?? null,
+            mobilityAid: disability.mobilityAid || null,
+            walking: disability.walking || null,
+            running: disability.running || null,
+            climbing: disability.climbing || null,
+            crawling: disability.crawling || null,
+            jumping: disability.jumping || null,
+            stairs: disability.stairs || null,
+            outdoorMobility: disability.outdoorMobility || null,
+          },
+        });
+      }
+      if (disability !== undefined) {
+        const currentExtraForm = await ensureExtraForm();
+
+        await tx.disability.upsert({
+          where: {
+            extraFormId: currentExtraForm.id,
+          },
+          update: {
+            functionalDiversity: disability.functionalDiversity || null,
+            disabilityDegree: disability.disabilityDegree || null,
+            dependencyDegree: disability.dependencyDegree || null,
+            wheelchair: disability.wheelchair ?? null,
+            mobilityAid: disability.mobilityAid || null,
+            walking: disability.walking || null,
+            running: disability.running || null,
+            climbing: disability.climbing || null,
+            crawling: disability.crawling || null,
+            jumping: disability.jumping || null,
+            stairs: disability.stairs || null,
+            outdoorMobility: disability.outdoorMobility || null,
+          },
+          create: {
+            extraFormId: currentExtraForm.id,
+            functionalDiversity: disability.functionalDiversity || null,
+            disabilityDegree: disability.disabilityDegree || null,
+            dependencyDegree: disability.dependencyDegree || null,
+            wheelchair: disability.wheelchair ?? null,
+            mobilityAid: disability.mobilityAid || null,
+            walking: disability.walking || null,
+            running: disability.running || null,
+            climbing: disability.climbing || null,
+            crawling: disability.crawling || null,
+            jumping: disability.jumping || null,
+            stairs: disability.stairs || null,
+            outdoorMobility: disability.outdoorMobility || null,
+          },
+        });
+      }
+      return tx.inscription.findUnique({
+        where: { id },
+        include: {
+          summerCamp: true,
+          participant: {
+            include: {
+              guardian: true,
+              address: true,
+              authorizedPeople: true,
+              allergies: true,
+              medications: true,
+              extraForm: {
+                include: {
+                  disability: true,
+                  sports: true,
+                  fears: true,
+                  communication: true,
+                  foodSensitivities: true,
+                },
+              },
+            },
+          },
+          signedUpWeeks: {
+            include: {
+              week: {
+                include: {
+                  summerCamp: true,
+                  prices: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+          payments: {
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+          appliedDiscounts: {
+            include: {
+              discount: true,
+            },
+          },
+        },
+      });
+    });
+
+    return res.json({
+      message: "Inscripción actualizada correctamente",
+      inscription: result,
+    });
+  } catch (error) {
+    console.error("Error al actualizar inscripción:", error);
+
+    return res.status(500).json({
+      error: error.message || "Error al actualizar inscripción",
     });
   }
 };

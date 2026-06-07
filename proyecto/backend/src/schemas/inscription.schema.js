@@ -6,9 +6,7 @@ import {
   optionalEmailSchema,
   phoneSchema,
   optionalPhoneSchema,
-  dniNieSchema,
   optionalDniNieSchema,
-  postalCodeSchema,
   optionalPostalCodeSchema,
   healthCardSchema,
   normalizedRequiredStringSchema,
@@ -18,7 +16,24 @@ import {
 import {
   paymentModeSchema,
   inscriptionStatusSchema,
+  schoolingTypeSchema,
+supportTypeSchema,
+hygieneLevelSchema,
+sphincterControlLevelSchema,
+eatingSupportLevelSchema,
+mobilityLevelSchema,
+swimmingLevelSchema,
+socialPlayLevelSchema,
+playDurationLevelSchema,
+oralLanguageLevelSchema,
+imitationLevelSchema,
+writingLevelSchema,
+comprehensionLevelSchema,
+readingLevelSchema,
+alternativeCommunicationTypeSchema,
+foodSensitivityTypeSchema,
 } from "./enums.schema.js";
+import { discountCodeSchema } from "./discount.schema.js";
 
 const participantSchema = z.object({
   name: normalizedRequiredStringSchema,
@@ -26,11 +41,24 @@ const participantSchema = z.object({
   birthdate: dateSchema,
   gender: normalizedOptionalStringSchema,
   healthCard: healthCardSchema.optional().nullable(),
+
   repeatedBefore: booleanSchema.optional(),
   siblings: booleanSchema.optional(),
   schoolRelated: booleanSchema.optional(),
-  schoolObservations: normalizedOptionalStringSchema,
+
   hasDisability: booleanSchema.optional(),
+  disabilityDegree: normalizedOptionalStringSchema,
+  dependencyDegree: normalizedOptionalStringSchema,
+  disabilityInfo: normalizedOptionalStringSchema,
+
+  allergyDescription: normalizedOptionalStringSchema,
+  medicationDescription: normalizedOptionalStringSchema,
+  symptomsInfo: normalizedOptionalStringSchema,
+
+  // ya no se usa desde el frontend,  considerar modificar la BD para eliminarlo
+  schoolObservations: normalizedOptionalStringSchema,
+
+  // Lo dejamos por compatibilidad, pero lo construiremos en el backend.
   notes: normalizedOptionalStringSchema,
 });
 
@@ -95,13 +123,6 @@ const selectedWeekSchema = z.object({
   earlyRise: booleanSchema.optional(),
 });
 
-const discountCodeSchema = z
-  .string()
-  .transform((value) => value.trim().toUpperCase())
-  .refine((value) => value.length > 0, {
-    message: "Código de descuento inválido",
-  });
-
 export const getInscriptionsQuerySchema = z.object({
   summerCampId: positiveIntSchema.optional(),
   number: positiveIntSchema.optional(),
@@ -115,19 +136,27 @@ export const inscriptionIdParamsSchema = z.object({
 
 export const createInscriptionBodySchema = z
   .object({
+    summerCampId: positiveIntSchema,
     participant: participantSchema,
     guardian: guardianSchema,
     address: addressSchema,
-    authorizedPeople: z.array(authorizedPersonSchema),
+    authorizedPeople: z
+      .array(authorizedPersonSchema)
+      .min(1, "Debe indicarse al menos una persona autorizada"),
     inscription: inscriptionDataSchema,
     weeks: z.array(selectedWeekSchema).min(1, "weeks debe tener al menos una semana"),
-    discounts: z.array(discountCodeSchema).optional().default([]),
+    discounts: z
+      .array(discountCodeSchema)
+      .optional()
+      .default([])
+      .transform((codes) => [...new Set(codes)]),
   })
   .superRefine((data, ctx) => {
     const seen = new Set();
 
     data.weeks.forEach((week, index) => {
       const key = `${week.summerCampId}-${week.number}`;
+
       if (seen.has(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -135,6 +164,170 @@ export const createInscriptionBodySchema = z
           message: "No se puede repetir la misma semana en una inscripción",
         });
       }
+
       seen.add(key);
     });
   });
+export const updateInscriptionDetailsBodySchema = z.object({
+  inscription: z
+    .object({
+      paymentMode: paymentModeSchema.optional(),
+      invoiceRequested: z.boolean().optional(),
+      invoiceIssued: z.boolean().optional(),
+      invoiceName: normalizedOptionalStringSchema,
+      invoiceDni: normalizedOptionalStringSchema,
+      dataTreatmentAccepted: z.boolean().optional(),
+      outingsAccepted: z.boolean().optional(),
+      imagesAccepted: z.boolean().optional(),
+      notes: normalizedOptionalStringSchema,
+    })
+    .optional(),
+
+  participant: z
+    .object({
+      name: normalizedRequiredStringSchema.optional(),
+      surname: normalizedRequiredStringSchema.optional(),
+      birthdate: z.string().optional(),
+      gender: normalizedOptionalStringSchema,
+      healthCard: normalizedOptionalStringSchema,
+      repeatedBefore: z.boolean().optional(),
+      siblings: z.boolean().optional(),
+      schoolRelated: z.boolean().optional(),
+      schoolObservations: normalizedOptionalStringSchema,
+      hasDisability: z.boolean().optional(),
+      notes: normalizedOptionalStringSchema,
+    })
+    .optional(),
+
+  guardian: z
+    .object({
+      name: normalizedRequiredStringSchema.optional(),
+      surname: normalizedRequiredStringSchema.optional(),
+      dni: normalizedOptionalStringSchema,
+      phone: normalizedRequiredStringSchema.optional(),
+      phone2: normalizedOptionalStringSchema,
+      email: normalizedRequiredStringSchema.optional(),
+      email2: normalizedOptionalStringSchema,
+      relation: normalizedOptionalStringSchema,
+    })
+    .optional(),
+
+  address: z
+    .object({
+      street: normalizedOptionalStringSchema,
+      city: normalizedOptionalStringSchema,
+      province: normalizedOptionalStringSchema,
+      postalCode: normalizedOptionalStringSchema,
+    })
+    .optional(),
+
+  allergies: z
+    .array(
+      z.object({
+        description: normalizedOptionalStringSchema,
+      })
+    )
+    .optional(),
+
+  medications: z
+    .array(
+      z.object({
+        description: normalizedOptionalStringSchema,
+      })
+    )
+    .optional(),
+
+  authorizedPeople: z
+    .array(
+      z.object({
+        name: normalizedOptionalStringSchema,
+        surname: normalizedOptionalStringSchema,
+        dni: normalizedOptionalStringSchema,
+        phone: normalizedOptionalStringSchema,
+        relation: normalizedOptionalStringSchema,
+      })
+    )
+    .optional(),
+
+    extraForm: z
+  .object({
+    calledBefore: z.boolean().nullable().optional(),
+    routines: normalizedOptionalStringSchema,
+    emotionalRegulation: normalizedOptionalStringSchema,
+    schoolingType: schoolingTypeSchema.nullable().optional(),
+    schoolingTypeOther: normalizedOptionalStringSchema,
+    supportType: supportTypeSchema.nullable().optional(),
+    hygiene: hygieneLevelSchema.nullable().optional(),
+    bladderControl: sphincterControlLevelSchema.nullable().optional(),
+    bowelControl: sphincterControlLevelSchema.nullable().optional(),
+    eatingSupport: eatingSupportLevelSchema.nullable().optional(),
+    feedingAdaptation: normalizedOptionalStringSchema,
+    chokingEpisodes: z.boolean().nullable().optional(),
+    extraInfo: normalizedOptionalStringSchema,
+  })
+  .optional(),
+
+disability: z
+  .object({
+    functionalDiversity: normalizedOptionalStringSchema,
+    disabilityDegree: normalizedOptionalStringSchema,
+    dependencyDegree: normalizedOptionalStringSchema,
+    wheelchair: z.boolean().nullable().optional(),
+    mobilityAid: normalizedOptionalStringSchema,
+    walking: mobilityLevelSchema.nullable().optional(),
+    running: mobilityLevelSchema.nullable().optional(),
+    climbing: mobilityLevelSchema.nullable().optional(),
+    crawling: mobilityLevelSchema.nullable().optional(),
+    jumping: mobilityLevelSchema.nullable().optional(),
+    stairs: mobilityLevelSchema.nullable().optional(),
+    outdoorMobility: mobilityLevelSchema.nullable().optional(),
+  })
+  .optional(),
+
+sports: z
+  .array(
+    z.object({
+      doesSport: z.boolean().nullable().optional(),
+      favoriteSports: normalizedOptionalStringSchema,
+      swimmingLevel: swimmingLevelSchema.nullable().optional(),
+      socialPlay: socialPlayLevelSchema.nullable().optional(),
+      playFixation: playDurationLevelSchema.nullable().optional(),
+    })
+  )
+  .optional(),
+
+fears: z
+  .array(
+    z.object({
+      fears: normalizedOptionalStringSchema,
+      copingMechanisms: normalizedOptionalStringSchema,
+    })
+  )
+  .optional(),
+
+communication: z
+  .array(
+    z.object({
+      oralLanguage: oralLanguageLevelSchema.nullable().optional(),
+      imitation: imitationLevelSchema.nullable().optional(),
+      writing: writingLevelSchema.nullable().optional(),
+      comprehension: comprehensionLevelSchema.nullable().optional(),
+      reading: readingLevelSchema.nullable().optional(),
+      alternativeCommunication:
+        alternativeCommunicationTypeSchema.nullable().optional(),
+      alternativeCommunicationOther: normalizedOptionalStringSchema,
+      comprehensionOther: normalizedOptionalStringSchema,
+      readingOther: normalizedOptionalStringSchema,
+    })
+  )
+  .optional(),
+
+foodSensitivities: z
+  .array(
+    z.object({
+      type: foodSensitivityTypeSchema,
+      otherText: normalizedOptionalStringSchema,
+    })
+  )
+  .optional(),
+});

@@ -6,9 +6,17 @@ import {
 import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
 import { updateAppSettingsBodySchema } from "../schemas/appSettings.schema.js";
+
 const router = express.Router();
 
-router.get("/", requireAuth, requireRole("ADMIN", "SUPERADMIN"), getAppSettings);
-router.patch("/", validate({ body: updateAppSettingsBodySchema }), updateAppSettings);
+router.get("/", requireAuth, getAppSettings);
+
+router.patch(
+  "/",
+  requireAuth,
+  requireRole("ADMIN", "SUPERADMIN"),
+  validate({ body: updateAppSettingsBodySchema }),
+  updateAppSettings
+);
 
 export default router;

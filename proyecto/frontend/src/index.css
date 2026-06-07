@@ -1,5 +1,9 @@
 @import "./styles/fonts.css";
 
+/* =========================
+   VARIABLES BASE
+========================= */
+
 :root {
   --enki-green: #289548;
   --enki-blue: #009de0;
@@ -7,15 +11,22 @@
   --enki-yellow: #f9dc0a;
   --enki-purple: #5a3888;
 
-  --color-primary: #F28C28;
-  --color-secondary: #3D3D3D;
-  --color-background: #FFFDF8;
+  --color-primary: #f28c28;
+  --color-secondary: #3d3d3d;
+  --color-background: #fffdf8;
   --color-text: #222222;
 
   --black: #000000;
   --white: #ffffff;
   --gray: #f4f4f4;
+
+  --error: #c83486;
+  --error-bg: #fff5fa;
 }
+
+/* =========================
+   RESET GLOBAL
+========================= */
 
 * {
   margin: 0;
@@ -23,17 +34,15 @@
   box-sizing: border-box;
 }
 
-body {
-  font-family: "Labil", sans-serif;
-  background-color: var(--color-background);
-  color: var(--color-text);
+html {
+  background: var(--color-background);
 }
 
-h1,
-h2,
-h3,
-.logo-text {
-  font-family: "Totally", sans-serif;
+body {
+  margin: 0;
+  font-family: "Labil", system-ui, Arial, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
 }
 
 button,
@@ -43,35 +52,13 @@ textarea {
   font: inherit;
 }
 
-.page {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 32px;
-}
-.navbar {
-  width: 100%;
-  padding: 18px 32px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--enki-yellow);
-  border-bottom: 4px solid var(--black);
+button {
+  cursor: pointer;
 }
 
-.navbar-logo {
+h1,
+h2,
+h3,
+.logo-text {
   font-family: "Totally", sans-serif;
-  font-size: 28px;
-  color: var(--black);
-  text-decoration: none;
-}
-
-.navbar-links {
-  display: flex;
-  gap: 20px;
-}
-
-.navbar-links a {
-  color: var(--black);
-  text-decoration: none;
-  font-weight: 700;
 }

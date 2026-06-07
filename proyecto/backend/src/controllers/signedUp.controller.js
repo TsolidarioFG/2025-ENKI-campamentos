@@ -336,6 +336,8 @@ export const getSignedUpsByWeek = async (req, res) => {
             participant: {
               include: {
                 guardian: true,
+                allergies: true,
+                medications: true,
               },
             },
           },

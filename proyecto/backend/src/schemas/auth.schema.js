@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { emailSchema, normalizedRequiredStringSchema } from "./common.schema.js";
+import { normalizedRequiredStringSchema } from "./common.schema.js";
 
 export const loginBodySchema = z.object({
-  email: emailSchema,
+  identifier: normalizedRequiredStringSchema,
   password: normalizedRequiredStringSchema,
 });

@@ -25,25 +25,18 @@ const DEFAULT_DISCOUNTS = [
 ];
 
 export const createDefaultDiscounts = async () => {
-  for (const defaultDiscount of DEFAULT_DISCOUNTS) {
-    const existingDiscount = await prisma.discount.findUnique({
-      where: { code: defaultDiscount.code },
+  for (const discount of DEFAULT_DISCOUNTS) {
+    await prisma.discount.upsert({
+      where: {
+        code: discount.code,
+      },
+      update: {
+        question: discount.question,
+        isActive: true,
+      },
+      create: discount,
     });
-
-    if (!existingDiscount) {
-      await prisma.discount.create({
-        data: defaultDiscount,
-      });
-      continue;
-    }
-
-    if (!existingDiscount.isActive) {
-      await prisma.discount.update({
-        where: { id: existingDiscount.id },
-        data: {
-          isActive: true,
-        },
-      });
-    }
   }
+
+  console.log("Descuentos por defecto comprobados correctamente");
 };

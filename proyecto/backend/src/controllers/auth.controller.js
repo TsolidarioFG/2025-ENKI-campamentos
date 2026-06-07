@@ -4,9 +4,15 @@ import { comparePassword, generateToken } from "../utils/auth.js";
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.validatedBody;
-    const user = await prisma.user.findUnique({
-      where: { email: email.trim() },
+    const { identifier, password } = req.body;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { username: identifier },
+        ],
+      },
     });
 
     if (!user) {

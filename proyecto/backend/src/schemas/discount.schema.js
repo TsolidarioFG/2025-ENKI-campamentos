@@ -7,7 +7,7 @@ import {
   normalizedOptionalStringSchema,
 } from "./common.schema.js";
 
-const discountCodeSchema = z
+export const discountCodeSchema = z
   .string({ required_error: "Campo obligatorio" })
   .transform((value) => value.trim().replace(/\s+/g, " ").toUpperCase())
   .refine((value) => value.length > 0, {

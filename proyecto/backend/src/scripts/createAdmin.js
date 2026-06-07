@@ -1,48 +1,32 @@
 import dotenv from "dotenv";
 import prisma from "../lib/prisma.js";
-import { hashPassword } from "../utils/auth.js";
+import { ensureInitialAdmin } from "../services/admin.creation.js";
 
 dotenv.config();
 
 const main = async () => {
-  const username = "admin";
-  const email = "admin@enki.com";
-  const plainPassword = "admin";
+  await ensureInitialAdmin();
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (existingUser) {
-    console.log("Ya existe un usuario con ese email.");
-    return;
-  }
-
-  const passwordHash = await hashPassword(plainPassword);
-
-  const user = await prisma.user.create({
-    data: {
-      username,
-      email,
-      passwordHash,
-      role: "SUPERADMIN",
-      active: true,
+  const settings = await prisma.appSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      pendingReservationHours: 48,
     },
   });
 
-  console.log("Admin creado correctamente:");
+  console.log("Ajustes generales comprobados correctamente:");
   console.log({
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    role: user.role,
-    password: plainPassword,
+    id: settings.id,
+    pendingReservationHours: settings.pendingReservationHours,
   });
 };
 
 main()
   .catch((error) => {
     console.error("Error creando admin:", error);
+    process.exitCode = 1;
   })
   .finally(async () => {
     await prisma.$disconnect();

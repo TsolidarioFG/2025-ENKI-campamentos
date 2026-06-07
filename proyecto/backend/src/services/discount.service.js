@@ -1,5 +1,3 @@
-import { normalizeText } from "../utils/validators.js";
-
 export const getAutomaticDiscountCodesFromParticipant = (participant) => {
   const codes = [];
 
@@ -10,36 +8,10 @@ export const getAutomaticDiscountCodesFromParticipant = (participant) => {
   return [...new Set(codes)];
 };
 
-export const extractManualDiscountRequests = (body) => {
-  const rawDiscounts = Array.isArray(body?.discounts)
-    ? body.discounts
-    : Array.isArray(body?.appliedDiscounts)
-    ? body.appliedDiscounts
-    : [];
-
-  const codes = [];
-
-  for (const item of rawDiscounts) {
-    let code = null;
-
-    if (typeof item === "string") {
-      code = normalizeText(item)?.toUpperCase();
-    } else if (item && typeof item === "object") {
-      code = normalizeText(item.code)?.toUpperCase();
-    }
-
-    if (code) {
-      codes.push(code);
-    }
-  }
-
-  return [...new Set(codes)];
-};
-
 export const resolveApplicableDiscountsForCreation = async (
   tx,
   participant,
-  manualDiscountRequests
+  manualDiscountRequests = []
 ) => {
   const codes = [
     ...getAutomaticDiscountCodesFromParticipant(participant),
@@ -47,17 +19,19 @@ export const resolveApplicableDiscountsForCreation = async (
   ];
 
   const uniqueCodes = [...new Set(codes)];
-  const discounts = [];
 
-  for (const code of uniqueCodes) {
-    const discount = await tx.discount.findUnique({
-      where: { code },
-    });
-
-    if (discount && discount.isActive) {
-      discounts.push(discount);
-    }
+  if (uniqueCodes.length === 0) {
+    return [];
   }
+
+  const discounts = await tx.discount.findMany({
+    where: {
+      code: {
+        in: uniqueCodes,
+      },
+      isActive: true,
+    },
+  });
 
   return discounts;
 };
@@ -100,7 +74,7 @@ export const getApplicableDiscountsForInscription = async (tx, inscriptionId) =>
     }));
 };
 
-export const applyDiscountsToAmount = (grossAmount, applicableDiscounts) => {
+export const applyDiscountsToAmount = (grossAmount, applicableDiscounts = []) => {
   const roundedGrossAmount = Number(Number(grossAmount || 0).toFixed(2));
 
   let totalDiscountPercentage = 0;
@@ -108,6 +82,8 @@ export const applyDiscountsToAmount = (grossAmount, applicableDiscounts) => {
   for (const discount of applicableDiscounts) {
     totalDiscountPercentage += Number(discount.percentage || 0);
   }
+
+  totalDiscountPercentage = Math.min(totalDiscountPercentage, 100);
 
   const totalDiscountAmount = Number(
     (roundedGrossAmount * (totalDiscountPercentage / 100)).toFixed(2)

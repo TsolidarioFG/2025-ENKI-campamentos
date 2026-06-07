@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma.js";
-import { getGlobalInscriptionStatus } from "../controllers/signedUp.controller.js"; 
+import { getGlobalInscriptionStatus } from "../controllers/signedUp.controller.js";
 import cron from "node-cron";
 
 export const cancelExpiredPendingSignedUpsLogic = async () => {
@@ -21,6 +21,22 @@ export const cancelExpiredPendingSignedUpsLogic = async () => {
   const expirationDate = new Date(
     now.getTime() - settings.pendingReservationHours * 60 * 60 * 1000
   );
+
+  const basicPendingSignedUps = await prisma.signedUp.findMany({
+    where: {
+      state: "PENDING",
+      createdAt: {
+        lte: expirationDate,
+      },
+    },
+  });
+
+  if (basicPendingSignedUps.length === 0) {
+    return {
+      cancelledCount: 0,
+      pendingReservationHours: settings.pendingReservationHours,
+    };
+  }
 
   const pendingSignedUps = await prisma.signedUp.findMany({
     where: {
@@ -51,7 +67,7 @@ export const cancelExpiredPendingSignedUpsLogic = async () => {
 
   await prisma.$transaction(async (tx) => {
     for (const signedUp of pendingSignedUps) {
-      const reservationAllocations = signedUp.paymentAllocations;
+      const reservationAllocations = signedUp.paymentAllocations || [];
 
       const reservationFullyPaid =
         reservationAllocations.length > 0 &&
@@ -135,16 +151,21 @@ export const cancelExpiredPendingSignedUpsLogic = async () => {
 };
 
 export const startCronJobs = () => {
-  // cada 5 minutos
   cron.schedule("*/5 * * * *", async () => {
     try {
       console.log("Ejecutando limpieza de reservas caducadas...");
 
       const result = await cancelExpiredPendingSignedUpsLogic();
 
-      console.log(
-        `Canceladas ${result.cancelledCount} reservas caducadas`
-      );
+      if (result.skipped) {
+        console.warn(
+          "Limpieza de reservas omitida:",
+          result.reason
+        );
+        return;
+      }
+
+      console.log(`Canceladas ${result.cancelledCount} reservas caducadas`);
     } catch (error) {
       console.error("Error en cron:", error);
     }

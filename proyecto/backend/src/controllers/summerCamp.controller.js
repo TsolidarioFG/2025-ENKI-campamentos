@@ -125,7 +125,17 @@ export const createSummerCamp = async (req, res) => {
         error: "El campamento debe generar al menos una semana",
       });
     }
+    const existingYear = await prisma.summerCamp.findUnique({
+      where: {
+        year,
+      },
+    });
 
+    if (existingYear) {
+      return res.status(409).json({
+        error: "Ya existe un campamento para ese año",
+      });
+    }
     const createdCamp = await prisma.$transaction(async (tx) => {
       const camp = await tx.summerCamp.create({
         data: {
@@ -565,5 +575,78 @@ export const deleteSummerCamp = async (req, res) => {
   } catch (error) {
     console.error("Error al eliminar campamento:", error);
     res.status(500).json({ error: "Error al eliminar campamento" });
+  }
+};
+
+export const getPublicSummerCampByYear = async (req, res) => {
+  try {
+    const { year } = req.params;
+    const parsedYear = Number(year);
+
+    const summerCamp = await prisma.summerCamp.findUnique({
+  where: {
+    year: parsedYear,
+  },
+  include: {
+    weeks: {
+      where: {
+        active: true,
+      },
+      orderBy: {
+        number: "asc",
+      },
+      include: {
+        prices: {
+          where: {
+            isActive: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
+      },
+    },
+  },
+});
+
+    if (!summerCamp) {
+      return res.status(404).json({
+        error: "Campamento no encontrado",
+      });
+    }
+
+    if (!summerCamp.isActive || !summerCamp.formEnabled) {
+      return res.status(403).json({
+        error: "El formulario de inscripción no está disponible actualmente",
+      });
+    }
+
+    const now = new Date();
+
+    if (
+      summerCamp.inscriptionOpenDate &&
+      now < new Date(summerCamp.inscriptionOpenDate)
+    ) {
+      return res.status(403).json({
+        error: "El periodo de inscripción todavía no está abierto",
+      });
+    }
+
+    if (
+      summerCamp.inscriptionCloseDate &&
+      now > new Date(summerCamp.inscriptionCloseDate)
+    ) {
+      return res.status(403).json({
+        error: "El periodo de inscripción ya está cerrado",
+      });
+    }
+
+    res.json(summerCamp);
+  } catch (error) {
+    console.error("Error al obtener campamento público:", error);
+    res.status(500).json({
+      error: "Error al obtener campamento público",
+    });
   }
 };

@@ -7,21 +7,45 @@ import {
   deleteDiscount,
 } from "../controllers/discount.controller.js";
 import { validate } from "../middleware/validate.middleware.js";
+import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 import {
   discountIdParamsSchema,
   createDiscountBodySchema,
   updateDiscountBodySchema,
 } from "../schemas/discount.schema.js";
+
 const router = express.Router();
 
 router.get("/", getDiscounts);
-router.post("/", validate({ body: createDiscountBodySchema }), createDiscount);
-router.get("/:discountId", validate({ params: discountIdParamsSchema }), getDiscountById);
+
+router.get(
+  "/:discountId",
+  validate({ params: discountIdParamsSchema }),
+  getDiscountById
+);
+
+router.post(
+  "/",
+  requireAuth,
+  requireRole("ADMIN", "SUPERADMIN"),
+  validate({ body: createDiscountBodySchema }),
+  createDiscount
+);
+
 router.patch(
   "/:discountId",
+  requireAuth,
+  requireRole("ADMIN", "SUPERADMIN"),
   validate({ params: discountIdParamsSchema, body: updateDiscountBodySchema }),
   updateDiscount
 );
-router.delete("/:discountId", validate({ params: discountIdParamsSchema }), deleteDiscount);
+
+router.delete(
+  "/:discountId",
+  requireAuth,
+  requireRole("ADMIN", "SUPERADMIN"),
+  validate({ params: discountIdParamsSchema }),
+  deleteDiscount
+);
 
 export default router;
