@@ -3,7 +3,7 @@ import {
   createExtraFormToken,
   getExtraFormByToken,
   updateExtraFormByToken,
-} from "../controllers/extraFormToken.controller.js";
+} from "../controllers/extraFormToken.Controller.js";
 import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 import { validate } from "../middleware/validate.middleware.js";
 import {

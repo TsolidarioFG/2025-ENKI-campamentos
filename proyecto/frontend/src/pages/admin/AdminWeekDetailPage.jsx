@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
-import { getSignedUpsByWeek } from "../../services/signedUpService";
+import { getSignedUpsByWeek } from "../../services/SignedUpService";
 import { Link } from "react-router-dom";
 
 export default function AdminWeekDetailPage() {

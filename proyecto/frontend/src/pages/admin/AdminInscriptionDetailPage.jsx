@@ -14,7 +14,7 @@ import {
   createExtraPayment,
   registerPayment,
 } from "../../services/paymentService";
-import { updateSignedUpStatus } from "../../services/signedUpService";
+import { updateSignedUpStatus } from "../../services/SignedUpService";
 import { useAuth } from "../../context/AuthContext";
 
 const formatMoney = (value) => `${Number(value || 0).toFixed(2)} €`;

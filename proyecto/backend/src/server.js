@@ -25,7 +25,7 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({origin: process.env.CORS_ORIGIN || "http://localhost:5173"}));
 app.use(express.json());
 
 app.get("/api/health", (req, res) => {
@@ -80,11 +80,12 @@ const startServer = async () => {
 
     console.log("Ajustes generales comprobados correctamente");
 
-    app.listen(PORT, () => {
-      console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Servidor corriendo en puerto: ${PORT}`);
       startCronJobs();
     });
   } catch (error) {
+    
     console.error("Error al iniciar la aplicación:", error);
     process.exit(1);
   }
