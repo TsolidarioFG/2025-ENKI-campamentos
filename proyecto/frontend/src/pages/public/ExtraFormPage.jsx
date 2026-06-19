@@ -276,9 +276,7 @@ export default function ExtraFormPage() {
     const fear = formData.fears?.[0] || {};
     const disability = formData.disability || {};
 
-    if (isEmpty(formData.calledBefore)) {
-      errors.calledBefore = "Indica si ENKI ha hablado antes con la familia.";
-    }
+    
 
     if (isEmpty(formData.routines)) {
       errors.routines = "Las rutinas importantes son obligatorias.";
@@ -480,7 +478,7 @@ const buildPayload = () => {
   const fear = formData.fears?.[0] || {};
 
   return {
-    calledBefore: selectValueToBoolean(formData.calledBefore),
+    calledBefore: true,
     routines: formData.routines || null,
     emotionalRegulation: formData.emotionalRegulation || null,
     schoolingType: formData.schoolingType || null,
@@ -646,21 +644,7 @@ const buildPayload = () => {
           <h2>Información general</h2>
 
           <div className="form-grid">
-            <Select
-              id="called-before"
-              label="¿Hemos hablado antes con la familia?"
-              required
-              error={fieldErrors.calledBefore}
-              value={formData.calledBefore}
-              onChange={(event) =>
-                updateField("calledBefore", event.target.value)
-              }
-            >
-              <option value="">Selecciona una opción</option>
-              <option value="true">Sí</option>
-              <option value="false">No</option>
-            </Select>
-
+            
             <Textarea
               id="routines"
               label="Rutinas importantes"

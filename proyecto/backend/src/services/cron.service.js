@@ -2,6 +2,34 @@ import prisma from "../lib/prisma.js";
 import { getGlobalInscriptionStatus } from "../controllers/signedUp.controller.js";
 import cron from "node-cron";
 
+const isFirstReservationPayment = (payment) => {
+  const concept = (payment.concept || "").toLowerCase();
+
+  return (
+    payment.paymentType === "FIRST_INSTALLMENT" ||
+    (concept.includes("primer pago") && concept.includes("reserva"))
+  );
+};
+
+const isReservationCoveredByPaymentMode = ({
+  paymentMode,
+  reservationAllocations,
+}) => {
+  if (reservationAllocations.length === 0) return false;
+
+  if (paymentMode === "TWO_PAYMENTS") {
+    return reservationAllocations.some(
+      (allocation) =>
+        isFirstReservationPayment(allocation.payment) &&
+        allocation.payment.status === "PAID"
+    );
+  }
+
+  return reservationAllocations.every(
+    (allocation) => allocation.payment.status === "PAID"
+  );
+};
+
 export const cancelExpiredPendingSignedUpsLogic = async () => {
   const now = new Date();
 
@@ -69,13 +97,12 @@ export const cancelExpiredPendingSignedUpsLogic = async () => {
     for (const signedUp of pendingSignedUps) {
       const reservationAllocations = signedUp.paymentAllocations || [];
 
-      const reservationFullyPaid =
-        reservationAllocations.length > 0 &&
-        reservationAllocations.every(
-          (allocation) => allocation.payment.status === "PAID"
-        );
+      const reservationCovered = isReservationCoveredByPaymentMode({
+  paymentMode: signedUp.inscription.paymentMode,
+  reservationAllocations,
+});
 
-      if (reservationFullyPaid) continue;
+if (reservationCovered) continue;
 
       const hasDisability =
         signedUp.inscription.participant.hasDisability === true;

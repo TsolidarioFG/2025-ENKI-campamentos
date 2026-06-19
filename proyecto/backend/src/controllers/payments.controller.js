@@ -27,7 +27,38 @@ const splitAmountInTwo = (amount) => {
   const second = Number((amount - first).toFixed(2));
   return [first, second];
 };
+const isFirstReservationPayment = (payment) => {
+  const concept = (payment.concept || "").toLowerCase();
 
+  return (
+    payment.paymentType === "FIRST_INSTALLMENT" ||
+    (concept.includes("primer pago") && concept.includes("reserva"))
+  );
+};
+
+const isPaymentPaidOrCurrent = (payment, currentPaymentId) => {
+  return payment.id === currentPaymentId || payment.status === "PAID";
+};
+
+const isReservationCoveredByPaymentMode = ({
+  paymentMode,
+  reservationAllocations,
+  currentPaymentId,
+}) => {
+  if (reservationAllocations.length === 0) return false;
+
+  if (paymentMode === "TWO_PAYMENTS") {
+    return reservationAllocations.some(
+      (allocation) =>
+        isFirstReservationPayment(allocation.payment) &&
+        isPaymentPaidOrCurrent(allocation.payment, currentPaymentId)
+    );
+  }
+
+  return reservationAllocations.every((allocation) =>
+    isPaymentPaidOrCurrent(allocation.payment, currentPaymentId)
+  );
+};
 export const getPayments = async (req, res) => {
   try {
     const { inscriptionId, status, paymentType } = req.validatedQuery;
@@ -419,11 +450,13 @@ export const registerPayment = async (req, res) => {
             },
           });
 
-        const fullyPaid = allReservationAllocationsForSignedUp.every((item) =>
-          item.payment.id === id ? true : item.payment.status === "PAID"
-        );
+        const reservationCovered = isReservationCoveredByPaymentMode({
+          paymentMode: existingPayment.inscription.paymentMode,
+          reservationAllocations: allReservationAllocationsForSignedUp,
+          currentPaymentId: id,
+        });
 
-        if (fullyPaid) {
+        if (reservationCovered) {
           const targetSignedUp = await tx.signedUp.findUnique({
             where: {
               inscriptionId_weekId: {

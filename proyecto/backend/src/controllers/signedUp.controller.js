@@ -32,75 +32,75 @@ const createReservationPaymentsForSingleSignedUp = async ({
   signedUp,
 }) => {
   if (paymentMode === "ONE_PAYMENT") {
-    const payment = await tx.payment.create({
-      data: {
-        paymentType: "EXTRA",
-        status: "PENDING",
-        amount: signedUp.priceApplied,
-        concept: `Pago reserva semana ${signedUp.week.number}`,
-        isMandatory: true,
-        inscriptionId,
-      },
-    });
+  const payment = await tx.payment.create({
+    data: {
+      paymentType: "FULL",
+      status: "PENDING",
+      amount: signedUp.priceApplied,
+      concept: `Pago reserva semana ${signedUp.week.number}`,
+      isMandatory: true,
+      inscriptionId,
+    },
+  });
 
-    await tx.paymentSignedUp.create({
-      data: {
-        paymentId: payment.id,
-        inscriptionId,
-        weekId: signedUp.weekId,
-        purpose: "RESERVATION",
-        amount: signedUp.priceApplied,
-      },
-    });
+  await tx.paymentSignedUp.create({
+    data: {
+      paymentId: payment.id,
+      inscriptionId,
+      weekId: signedUp.weekId,
+      purpose: "RESERVATION",
+      amount: signedUp.priceApplied,
+    },
+  });
 
-    return;
-  }
+  return;
+}
 
-  if (paymentMode === "TWO_PAYMENTS") {
-    const [firstAmount, secondAmount] = splitAmountInTwo(signedUp.priceApplied);
+if (paymentMode === "TWO_PAYMENTS") {
+  const [firstAmount, secondAmount] = splitAmountInTwo(signedUp.priceApplied);
 
-    const firstPayment = await tx.payment.create({
-      data: {
-        paymentType: "EXTRA",
-        status: "PENDING",
-        amount: firstAmount,
-        concept: `Primer pago reserva semana ${signedUp.week.number}`,
-        isMandatory: true,
-        inscriptionId,
-      },
-    });
+  const firstPayment = await tx.payment.create({
+    data: {
+      paymentType: "FIRST_INSTALLMENT",
+      status: "PENDING",
+      amount: firstAmount,
+      concept: `Primer pago reserva semana ${signedUp.week.number}`,
+      isMandatory: true,
+      inscriptionId,
+    },
+  });
 
-    const secondPayment = await tx.payment.create({
-      data: {
-        paymentType: "EXTRA",
-        status: "PENDING",
-        amount: secondAmount,
-        concept: `Segundo pago reserva semana ${signedUp.week.number}`,
-        isMandatory: true,
-        inscriptionId,
-      },
-    });
+  const secondPayment = await tx.payment.create({
+    data: {
+      paymentType: "SECOND_INSTALLMENT",
+      status: "PENDING",
+      amount: secondAmount,
+      concept: `Segundo pago reserva semana ${signedUp.week.number}`,
+      isMandatory: true,
+      inscriptionId,
+    },
+  });
 
-    await tx.paymentSignedUp.create({
-      data: {
-        paymentId: firstPayment.id,
-        inscriptionId,
-        weekId: signedUp.weekId,
-        purpose: "RESERVATION",
-        amount: firstAmount,
-      },
-    });
+  await tx.paymentSignedUp.create({
+    data: {
+      paymentId: firstPayment.id,
+      inscriptionId,
+      weekId: signedUp.weekId,
+      purpose: "RESERVATION",
+      amount: firstAmount,
+    },
+  });
 
-    await tx.paymentSignedUp.create({
-      data: {
-        paymentId: secondPayment.id,
-        inscriptionId,
-        weekId: signedUp.weekId,
-        purpose: "RESERVATION",
-        amount: secondAmount,
-      },
-    });
-  }
+  await tx.paymentSignedUp.create({
+    data: {
+      paymentId: secondPayment.id,
+      inscriptionId,
+      weekId: signedUp.weekId,
+      purpose: "RESERVATION",
+      amount: secondAmount,
+    },
+  });
+}
 };
 
 export const updateSignedUpStatus = async (req, res) => {

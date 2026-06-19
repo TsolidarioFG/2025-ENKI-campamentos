@@ -339,7 +339,7 @@ export default function WeeksSelector({
 
               {selected && price && (
                 <div className="week-services">
-                  <label>
+                  <label className="checkbox-label">
                     <input
                       type="checkbox"
                       checked={selectedWeek.breakfast}
@@ -350,7 +350,7 @@ export default function WeeksSelector({
                     Desayuno (+{price.breakfastPrice} €)
                   </label>
 
-                  <label>
+                  <label className="checkbox-label">
                     <input
                       type="checkbox"
                       checked={selectedWeek.lunch}
@@ -361,7 +361,7 @@ export default function WeeksSelector({
                     Comedor (+{price.lunchPrice} €)
                   </label>
 
-                  <label>
+                  <label className="checkbox-label">
                     <input
                       type="checkbox"
                       checked={selectedWeek.earlyRise}
@@ -391,11 +391,11 @@ export default function WeeksSelector({
 
       <div className="price-box">
         <p>
-          <strong>Total bruto con plaza:</strong> {totals.payNowGross} €
+          Total bruto con plaza: {totals.payNowGross} €
         </p>
 
         <p>
-          <strong>Descuento aplicado:</strong> -{totals.payNowDiscount} €
+          Descuento aplicado: -{totals.payNowDiscount} €
         </p>
 
         <p>
@@ -405,12 +405,12 @@ export default function WeeksSelector({
         <hr />
 
         <p>
-          <strong>Importe bruto en lista de espera:</strong>{" "}
+          Importe bruto en lista de espera:{" "}
           {totals.waitlistGross} €
         </p>
 
         <p>
-          <strong>Descuento aplicado en lista de espera:</strong>{" "}
+          Descuento aplicado en lista de espera:{" "}
           -{totals.waitlistDiscount} €
         </p>
 

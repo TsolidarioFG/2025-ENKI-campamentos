@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const loadUser = async () => {
-      const token = localStorage.getItem("token");
+      const token = sessionStorage.getItem("token");
 
       if (!token) {
         setAuthLoading(false);
@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
         const result = await getMe();
         setUser(result.user);
       } catch {
-        localStorage.removeItem("token");
+        sessionStorage.removeItem("token");
         setUser(null);
       } finally {
         setAuthLoading(false);
@@ -33,14 +33,14 @@ export function AuthProvider({ children }) {
   const login = async ({ identifier, password }) => {
     const result = await loginRequest({ identifier, password });
 
-    localStorage.setItem("token", result.token);
+    sessionStorage.setItem("token", result.token);
     setUser(result.user);
 
     return result.user;
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
     setUser(null);
   };
 

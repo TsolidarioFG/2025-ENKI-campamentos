@@ -67,7 +67,7 @@ export default function DiscountSelector({
             No hay descuentos automáticos marcados.
           </p>
         ) : (
-          <ul>
+          <ul className="discount-list">
             {automaticDiscounts.map((discount) => (
               <li key={discount.code}>
                 {discount.label} - {discount.percentage}%
