@@ -1,180 +1,183 @@
-# ENKI Campamentos - Backend
+# ENKI Camp Registration Management Application
 
-Backend del sistema de gestión de campamentos inclusivos ENKI, desarrollado con **Node.js**, **Express** y **Prisma**.
+This repository contains the source code of the web application developed as a Final Degree Project for the management of registrations for ENKI's inclusive summer camps.
 
----
+The application replaces a manual workflow based on generic forms and spreadsheets with a custom web system adapted to ENKI's registration process. It includes a public registration form for families or legal guardians and a private administration panel for ENKI staff.
 
-## Tecnologías utilizadas
+## Main Features
 
-- Node.js
-- Express
-- Prisma ORM
-- PostgreSQL
-- JWT
-- bcrypt
-- node-cron
+* Public registration form for summer camp participants.
+* Registration of participant, guardian, address and authorized people information.
+* Selection of one or more camp weeks.
+* Selection of additional services such as breakfast, lunch and early arrival.
+* Management of general places and disability places.
+* Calculation of expected payment amounts.
+* Payment tracking and pending amount management.
+* Discount management.
+* Token-based extra form for additional participant information.
+* Private administration panel for ENKI staff.
+* Authentication and protected administration routes.
+* Camp week, user, price, discount and registration management.
+* Automatic handling of expired unpaid pending reservations.
 
----
+## Technology Stack
 
-## Cómo ejecutar el proyecto
+### Frontend
 
-### 1. Clonar el repositorio
+* React
+* JavaScript
+* JSX
+* CSS
+* Vite
+* React Router
+* npm
 
-    git clone https://github.com/TsolidarioFG/2025-ENKI-campamentos.git
-    cd 2025-ENKI-campamentos/proyecto/backend
+### Backend
 
-### 2. Instalar dependencias
+* Node.js
+* Express
+* Prisma
+* PostgreSQL
+* Zod
+* bcrypt
+* JSON Web Tokens
+* CORS
 
-    npm install
+### Development and Testing Tools
 
-### 3. Configurar variables de entorno
+* Git
+* GitHub
+* pgAdmin
+* SoapUI
 
-Crear un archivo `.env` en la carpeta `backend` con al menos estas variables:
+## Project Structure
 
-    DATABASE_URL="postgresql://USUARIO:CONTRASEÑA@HOST:PUERTO/NOMBRE_BD?schema=public"
-    PORT=3000
-    JWT_SECRET=clave_secreta
+The project is divided into two main parts:
 
-### 4. Aplicar migraciones de base de datos
+```text
+frontend/
+backend/
+```
 
-    npx prisma migrate dev
-    npx prisma generate
+The frontend contains the React application, including the public registration form, the extra form, the login page and the administration panel.
 
-### Si se quiere partir de una base de datos limpia
+The backend contains the Express API, validation schemas, controllers, middleware, services, Prisma configuration and initialization scripts.
 
-    npx prisma migrate reset
-    npx prisma generate
+## Environment Variables
 
-### 5. Crear el superadmin inicial
+The application requires environment variables for both the backend and frontend.
 
-    node src/scripts/createAdmin.js
+### Backend environment variables
 
-### 6. Iniciar el servidor
+Create a `.env` file in the backend folder with values similar to the following:
 
-    npm run dev
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/DATABASE_NAME"
+JWT_SECRET="your_jwt_secret"
+JWT_EXPIRES_IN="1d"
+PORT=3000
+CORS_ORIGIN="http://localhost:5173"
+```
 
-El backend quedará disponible en:
+### Frontend environment variables
 
-    http://localhost:3000
+Create a `.env` file in the frontend folder with values similar to the following:
 
----
+```env
+VITE_API_URL="http://localhost:3000/api"
+```
 
-## Endpoints principales
+The exact values may change depending on the local or deployment environment.
 
-### Auth
+## Installation
 
-- `POST /api/auth/login`
-- `GET /api/auth/me`
+Clone the repository:
 
-### Usuarios
+```bash
+git clone https://github.com/TsolidarioFG/2025-ENKI-campamentos.git
+cd 2025-ENKI-campamentos
+```
 
-- `GET /api/users`
-- `POST /api/users`
-- `PATCH /api/users/:id/status`
+Install backend dependencies:
 
-### Campamentos
+```bash
+cd backend
+npm install
+```
 
-- `GET /api/summercamps`
-- `POST /api/summercamps`
-- `PATCH /api/summercamps/:id`
-- `DELETE /api/summercamps/:id`
+Install frontend dependencies:
 
-### Semanas
+```bash
+cd ../frontend
+npm install
+```
 
-- `GET /api/weeks`
-- `POST /api/weeks`
-- `PATCH /api/weeks/summercamp/:summerCampId/week/:number`
-- `DELETE /api/weeks/summercamp/:summerCampId/week/:number`
+## Database Setup
 
-### Precios
+The backend uses PostgreSQL and Prisma.
 
-- `GET /api/prices`
-- `POST /api/prices`
-- `PATCH /api/prices`
-- `POST /api/payments/extra`
+After configuring the backend `.env` file, generate the Prisma client:
 
-### Inscripciones
+```bash
+cd backend
+npx prisma generate
+```
 
-- `POST /api/inscriptions`
-- `GET /api/inscriptions`
-- `GET /api/inscriptions/:id`
-- `PATCH /api/inscriptions/:id/cancel`
+Apply the database schema:
 
-### Reservas semanales
+```bash
+npx prisma migrate dev
+```
 
-- `GET /api/signedup/week/:weekId`
-- `GET /api/signedup/week/:weekId/waitlist`
-- `PATCH /api/signedup/inscription/:inscriptionId/week/:weekId/status`
-- `POST /api/signedup/cancel-expired`
+or, during development:
 
-### Administración
+```bash
+npx prisma db push
+```
 
-- `GET /api/admin/dashboard/:summerCampId`
-- `GET /api/admin/inscriptions-table`
-- `GET /api/admin/pending-payments`
-- `GET /api/admin/debtors`
+## Initial Data
 
-### Ajustes globales
+The project includes initialization logic for essential system data, such as:
 
-- `GET /api/settings`
-- `PATCH /api/settings`
+* Initial superadministrator account.
+* Global application settings.
+* Default permanent discounts.
 
----
+These scripts should be executed after the database has been created and configured.
 
-## Autenticación y roles
+## Running the Application
 
-El sistema utiliza **JWT**.
+Run the backend development server:
 
-### Roles disponibles
+```bash
+cd backend
+npm run dev
+```
 
-- `SUPERADMIN`
-- `ADMIN`
-- `USER`
+Run the frontend development server:
 
-### Restricciones actuales
+```bash
+cd frontend
+npm run dev
+```
 
-- Solo puede existir un `SUPERADMIN`
-- Los usuarios creados desde la API solo pueden ser `ADMIN` o `USER`
-- Las rutas administrativas están protegidas por autenticación y rol
+The frontend will be available through the Vite development server, and it will communicate with the backend API using the configured `VITE_API_URL`.
 
----
+## Testing
 
-## Automatizaciones
+During development, backend endpoints were tested using SoapUI before the frontend was fully completed. The final application was also tested manually through the browser, validating the main workflows:
 
-El sistema incluye una tarea programada con `node-cron` para revisar reservas `PENDING` caducadas y cancelarlas automáticamente según la configuración global del sistema.
+* Registration creation.
+* Validation of invalid data.
+* Week selection and capacity management.
+* Payment updates.
+* Discount management.
+* Extra form access by token.
+* Administration panel access.
+* Protected routes.
 
----
+## Notes
 
-## Estado actual del proyecto
+This project was developed as an academic Final Degree Project. It is focused on the management of inclusive summer camp registrations for ENKI and does not aim to replace all the digital tools used by the organization.
 
-Actualmente el backend cubre:
-
-- gestión de campamentos
-- semanas y precios
-- inscripciones
-- estados de reserva
-- pagos iniciales y pagos extra
-- autenticación y roles
-- herramientas administrativas básicas
-
----
-
-## Errores conocidos / trabajo pendiente
-
-- Falta implementar completamente la lógica de descuentos
-- Hay que revisar y validar en profundidad la transición automática de `PENDING` a `ACCEPTED` cuando se paga una reserva y cómo se registrará el pago
-- Hay que revisar y validar en profundidad la cancelación automática de reservas `PENDING` cuando no se pagan en el tiempo configurado
-- Faltan validaciones de formato para algunos campos:
-  - teléfono
-  - DNI
-  - health card
-  - email
-- Falta implementar toda la lógica y endpoints del `ExtraForm`
-- Faltan comprobaciones de casos específicos y casos límite en varias partes del sistema
-- Falta revisar en detalle el comportamiento de:
-  - `DELETE`
-  - cancelaciones
-  - relaciones encadenadas al cancelar o eliminar datos
-- Falta implementar edición de información ya guardada en una inscripción, para corregir errores introducidos en el formulario por el usuario
-- Falta terminar la validación completa de todos los endpoints con SoapUI
-- El frontend todavía no está implementado
+The payment gateway itself is outside the scope of the project. The application stores and manages payment information, but the actual payment operation is performed externally.
