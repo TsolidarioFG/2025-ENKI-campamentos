@@ -406,6 +406,11 @@ export default function InscriptionPage() {
           "Debes aceptar el tratamiento de datos";
       }
 
+        if (!formData.inscription.outingsAccepted) {
+    errors["inscription.outingsAccepted"] =
+      "Debes autorizar las salidas o excursiones";
+  }
+
       if (formData.inscription.invoiceRequested) {
         requiredText(
           "inscription.invoiceName",
@@ -602,11 +607,13 @@ export default function InscriptionPage() {
           <>
            
 
-            <DiscountSelector
-              participant={formData.participant}
-              discounts={formData.discounts}
-              onDiscountsChange={(value) => updateFormSection("discounts", value)}
-            />
+            <div className="discount-selector-wrapper">
+              <DiscountSelector
+                participant={formData.participant}
+                discounts={formData.discounts}
+                onDiscountsChange={(value) => updateFormSection("discounts", value)}
+              />
+            </div>
             {fieldErrors.weeks && (
               <p className="field-error-message">{fieldErrors.weeks}</p>
             )}

@@ -258,18 +258,18 @@ export default function WeeksSelector({
       )}
 
       {appliedDiscounts.length > 0 && (
-        <div className="discount-summary">
-          <strong>Descuentos aplicados:</strong>
+  <div className="discount-summary">
+    <strong>Descuentos aplicados:</strong>
 
-          <ul>
-            {appliedDiscounts.map((discount) => (
-              <li key={discount.id}>
-                {discount.code} - {discount.percentage}%
-              </li>
-            ))}
-          </ul>
+    <div className="discount-summary-list">
+      {appliedDiscounts.map((discount) => (
+        <div key={discount.id} className="discount-summary-item">
+          {discount.code} - {discount.percentage}%
         </div>
-      )}
+      ))}
+    </div>
+  </div>
+)}
 
       <div className="weeks-grid">
         {weeks.map((week) => {

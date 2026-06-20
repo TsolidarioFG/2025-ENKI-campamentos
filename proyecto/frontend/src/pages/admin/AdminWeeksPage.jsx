@@ -122,7 +122,8 @@ export default function AdminWeeksPage() {
                 {week.availableDisabilityPlaces}
               </p>
 
-              <Link to={`/administracion/semanas/${week.id}`}>
+              <Link to={`/administracion/semanas/${week.id}`}
+              state={{ weekNumber: week.number }}>
                 <Button type="button">Ver listado</Button>
               </Link>
             </Card>

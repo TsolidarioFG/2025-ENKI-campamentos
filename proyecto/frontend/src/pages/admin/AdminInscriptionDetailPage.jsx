@@ -632,19 +632,21 @@ export default function AdminInscriptionDetailPage() {
   const payments = inscription.payments || [];
   const signedUpWeeks = inscription.signedUpWeeks || [];
 
-  const shouldShowExtraForm =
-    isEditing ||
-    (extraForm &&
-      (extraForm.routines ||
-        extraForm.emotionalRegulation ||
-        extraForm.schoolingType ||
-        extraForm.supportType ||
-        extraForm.hygiene ||
-        extraForm.extraInfo ||
-        extraForm.communication?.length ||
-        extraForm.sports?.length ||
-        extraForm.fears?.length ||
-        extraForm.foodSensitivities?.length));
+  const hasExtraFormContent = Boolean(
+  extraForm &&
+    (extraForm.routines ||
+      extraForm.emotionalRegulation ||
+      extraForm.schoolingType ||
+      extraForm.supportType ||
+      extraForm.hygiene ||
+      extraForm.extraInfo ||
+      (extraForm.communication?.length ?? 0) > 0 ||
+      (extraForm.sports?.length ?? 0) > 0 ||
+      (extraForm.fears?.length ?? 0) > 0 ||
+      (extraForm.foodSensitivities?.length ?? 0) > 0)
+);
+
+const shouldShowExtraForm = isEditing || hasExtraFormContent;
 
   return (
     <section className="detail-section-stack">
@@ -2804,7 +2806,9 @@ export default function AdminInscriptionDetailPage() {
             </Button>
           </div>
 
-          {copyMessage && <p className="form-success">{copyMessage}</p>}
+          {copyMessage && (
+  <p className="form-success extraform-copy-message">{copyMessage}</p>
+)}
         </Card>
       )}
     </section>

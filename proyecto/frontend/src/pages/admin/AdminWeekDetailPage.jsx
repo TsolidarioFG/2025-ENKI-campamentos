@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { getSignedUpsByWeek } from "../../services/SignedUpService";
-import { Link } from "react-router-dom";
+
 
 export default function AdminWeekDetailPage() {
   const { weekId } = useParams();
-
+  const location = useLocation();
+  const weekNumber = location.state?.weekNumber;
   const [signedUps, setSignedUps] = useState([]);
   const [filters, setFilters] = useState({
     breakfast: "",
@@ -143,7 +144,7 @@ export default function AdminWeekDetailPage() {
         <button type="button" onClick={() => history.back()} className="back-button">
           Atrás
         </button>
-        <h1>Semana {weekId}</h1>
+        <h1>Semana {weekNumber || weekId}</h1>
         <p>Listado de personas inscritas en esta semana.</p>
       </div>
 
