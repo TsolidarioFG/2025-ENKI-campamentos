@@ -129,7 +129,7 @@ export default function InscriptionConfirmationPage() {
 
           <div>
             <span className="summary-label">Estado</span>
-            <strong>{inscription.globalStatus}</strong>
+            <strong>{getGlobalStatusLabel(inscription.globalStatus)}</strong>
           </div>
 
           <div>

@@ -890,24 +890,26 @@ export const updateInscriptionDetails = async (req, res) => {
           },
         },
       });
-      const ensureExtraForm = async () => {
-  const existingExtraForm = await tx.extraForm.findUnique({
-    where: {
-      participantId: existingInscription.participantId,
-    },
-  });
 
-  if (existingExtraForm) return existingExtraForm;
-
-  return tx.extraForm.create({
-    data: {
-      participantId: existingInscription.participantId,
-    },
-  });
-};
       if (!existingInscription) {
         throw new Error("La inscripción no existe");
       }
+
+      const ensureExtraForm = async () => {
+        const existingExtraForm = await tx.extraForm.findUnique({
+          where: {
+            participantId: existingInscription.participantId,
+          },
+        });
+
+        if (existingExtraForm) return existingExtraForm;
+
+        return tx.extraForm.create({
+          data: {
+            participantId: existingInscription.participantId,
+          },
+        });
+      };
 
       if (inscription) {
         await tx.inscription.update({
@@ -974,9 +976,6 @@ export const updateInscriptionDetails = async (req, res) => {
             }),
             ...(participant.schoolObservations !== undefined && {
               schoolObservations: participant.schoolObservations || null,
-            }),
-            ...(participant.hasDisability !== undefined && {
-              hasDisability: participant.hasDisability,
             }),
             ...(participant.notes !== undefined && {
               notes: participant.notes || null,
@@ -1068,6 +1067,7 @@ export const updateInscriptionDetails = async (req, res) => {
           });
         }
       }
+
       if (allergies !== undefined) {
         await tx.allergy.deleteMany({
           where: {
@@ -1126,7 +1126,9 @@ export const updateInscriptionDetails = async (req, res) => {
             relation: item.relation?.trim() || null,
             participantId: existingInscription.participantId,
           }))
-          .filter((item) => item.name || item.surname || item.phone || item.relation);
+          .filter(
+            (item) => item.name || item.surname || item.phone || item.relation
+          );
 
         if (cleanAuthorizedPeople.length > 0) {
           await tx.authorizedPerson.createMany({
@@ -1134,6 +1136,7 @@ export const updateInscriptionDetails = async (req, res) => {
           });
         }
       }
+
       if (extraForm !== undefined) {
         const currentExtraForm = await ensureExtraForm();
 
@@ -1161,6 +1164,7 @@ export const updateInscriptionDetails = async (req, res) => {
           },
         });
       }
+
       if (disability !== undefined) {
         const currentExtraForm = await ensureExtraForm();
 
@@ -1199,44 +1203,138 @@ export const updateInscriptionDetails = async (req, res) => {
           },
         });
       }
-      if (disability !== undefined) {
+
+      if (sports !== undefined) {
         const currentExtraForm = await ensureExtraForm();
 
-        await tx.disability.upsert({
+        await tx.sport.deleteMany({
           where: {
             extraFormId: currentExtraForm.id,
           },
-          update: {
-            functionalDiversity: disability.functionalDiversity || null,
-            disabilityDegree: disability.disabilityDegree || null,
-            dependencyDegree: disability.dependencyDegree || null,
-            wheelchair: disability.wheelchair ?? null,
-            mobilityAid: disability.mobilityAid || null,
-            walking: disability.walking || null,
-            running: disability.running || null,
-            climbing: disability.climbing || null,
-            crawling: disability.crawling || null,
-            jumping: disability.jumping || null,
-            stairs: disability.stairs || null,
-            outdoorMobility: disability.outdoorMobility || null,
-          },
-          create: {
+        });
+
+        const cleanSports = sports
+          .map((item) => ({
             extraFormId: currentExtraForm.id,
-            functionalDiversity: disability.functionalDiversity || null,
-            disabilityDegree: disability.disabilityDegree || null,
-            dependencyDegree: disability.dependencyDegree || null,
-            wheelchair: disability.wheelchair ?? null,
-            mobilityAid: disability.mobilityAid || null,
-            walking: disability.walking || null,
-            running: disability.running || null,
-            climbing: disability.climbing || null,
-            crawling: disability.crawling || null,
-            jumping: disability.jumping || null,
-            stairs: disability.stairs || null,
-            outdoorMobility: disability.outdoorMobility || null,
+            doesSport: item.doesSport ?? null,
+            favoriteSports: item.favoriteSports || null,
+            swimmingLevel: item.swimmingLevel || null,
+            socialPlay: item.socialPlay || null,
+            playFixation: item.playFixation || null,
+          }))
+          .filter(
+            (item) =>
+              item.doesSport !== null ||
+              item.favoriteSports ||
+              item.swimmingLevel ||
+              item.socialPlay ||
+              item.playFixation
+          );
+
+        if (cleanSports.length > 0) {
+          await tx.sport.createMany({
+            data: cleanSports,
+          });
+        }
+      }
+
+      if (fears !== undefined) {
+        const currentExtraForm = await ensureExtraForm();
+
+        await tx.fear.deleteMany({
+          where: {
+            extraFormId: currentExtraForm.id,
           },
         });
+
+        const cleanFears = fears
+          .map((item) => ({
+            extraFormId: currentExtraForm.id,
+            fears: item.fears || null,
+            copingMechanisms: item.copingMechanisms || null,
+          }))
+          .filter((item) => item.fears || item.copingMechanisms);
+
+        if (cleanFears.length > 0) {
+          await tx.fear.createMany({
+            data: cleanFears,
+          });
+        }
       }
+
+      if (communication !== undefined) {
+        const currentExtraForm = await ensureExtraForm();
+
+        await tx.communication.deleteMany({
+          where: {
+            extraFormId: currentExtraForm.id,
+          },
+        });
+
+        const cleanCommunication = communication
+          .map((item) => ({
+            extraFormId: currentExtraForm.id,
+            oralLanguage: item.oralLanguage || null,
+            imitation: item.imitation || null,
+            writing: item.writing || null,
+            comprehension: item.comprehension || null,
+            comprehensionOther:
+              item.comprehension === "OTHER"
+                ? item.comprehensionOther || null
+                : null,
+            reading: item.reading || null,
+            readingOther:
+              item.reading === "OTHER" ? item.readingOther || null : null,
+            alternativeCommunication: item.alternativeCommunication || null,
+            alternativeCommunicationOther:
+              item.alternativeCommunication === "OTHER"
+                ? item.alternativeCommunicationOther || null
+                : null,
+          }))
+          .filter(
+            (item) =>
+              item.oralLanguage ||
+              item.imitation ||
+              item.writing ||
+              item.comprehension ||
+              item.comprehensionOther ||
+              item.reading ||
+              item.readingOther ||
+              item.alternativeCommunication ||
+              item.alternativeCommunicationOther
+          );
+
+        if (cleanCommunication.length > 0) {
+          await tx.communication.createMany({
+            data: cleanCommunication,
+          });
+        }
+      }
+
+      if (foodSensitivities !== undefined) {
+        const currentExtraForm = await ensureExtraForm();
+
+        await tx.foodSensitivity.deleteMany({
+          where: {
+            extraFormId: currentExtraForm.id,
+          },
+        });
+
+        const cleanFoodSensitivities = foodSensitivities
+          .map((item) => ({
+            extraFormId: currentExtraForm.id,
+            type: item.type,
+            otherText: item.type === "OTHER" ? item.otherText || null : null,
+          }))
+          .filter((item) => item.type);
+
+        if (cleanFoodSensitivities.length > 0) {
+          await tx.foodSensitivity.createMany({
+            data: cleanFoodSensitivities,
+          });
+        }
+      }
+
       return tx.inscription.findUnique({
         where: { id },
         include: {
@@ -1273,6 +1371,9 @@ export const updateInscriptionDetails = async (req, res) => {
             },
           },
           payments: {
+            include: {
+              paymentAllocations: true,
+            },
             orderBy: {
               createdAt: "asc",
             },

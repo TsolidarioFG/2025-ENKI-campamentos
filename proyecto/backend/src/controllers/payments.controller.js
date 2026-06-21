@@ -27,6 +27,19 @@ const splitAmountInTwo = (amount) => {
   const second = Number((amount - first).toFixed(2));
   return [first, second];
 };
+const serviceFieldByPurpose = {
+  BREAKFAST: "breakfast",
+  LUNCH: "lunch",
+  EARLY_RISE: "earlyRise",
+};
+
+const serviceLabelByPurpose = {
+  BREAKFAST: "Desayuno",
+  LUNCH: "Comedor",
+  EARLY_RISE: "Madrugadores",
+  OTHER: "Extra",
+};
+
 const isFirstReservationPayment = (payment) => {
   const concept = (payment.concept || "").toLowerCase();
 
@@ -192,6 +205,14 @@ export const createExtraPayment = async (req, res) => {
         );
       }
 
+      const serviceField = serviceFieldByPurpose[purpose];
+
+      if (serviceField && signedUp[serviceField]) {
+        throw new Error(
+          `Ese servicio ya está marcado para la semana ${signedUp.week.number}`
+        );
+      }
+
       const applicableDiscounts = await getApplicableDiscountsForInscription(
         tx,
         inscriptionId
@@ -200,15 +221,19 @@ export const createExtraPayment = async (req, res) => {
       const discountResult = applyDiscountsToAmount(amount, applicableDiscounts);
       const finalExtraAmount = discountResult.finalAmount;
 
+      const visibleConcept =
+        concept ||
+        `${serviceLabelByPurpose[purpose] || "Extra"} - Semana ${
+          signedUp.week.number
+        }`;
+
       if (paymentMode === "ONE_PAYMENT") {
         const payment = await tx.payment.create({
           data: {
             paymentType: "EXTRA",
             status: "PENDING",
             amount: finalExtraAmount,
-            concept:
-              concept ||
-              `Pago extra ${purpose} para semana ${signedUp.week.number}`,
+            concept: visibleConcept,
             dueDate: finalDueDate,
             receiptRequested: receiptRequested ?? false,
             isMandatory: isMandatory ?? true,
@@ -237,9 +262,7 @@ export const createExtraPayment = async (req, res) => {
             paymentType: "EXTRA",
             status: "PENDING",
             amount: firstAmount,
-            concept:
-              concept ||
-              `Primer pago extra ${purpose} para semana ${signedUp.week.number}`,
+            concept: `Primer pago ${visibleConcept}`,
             dueDate: finalDueDate,
             receiptRequested: receiptRequested ?? false,
             isMandatory: isMandatory ?? true,
@@ -253,9 +276,7 @@ export const createExtraPayment = async (req, res) => {
             paymentType: "EXTRA",
             status: "PENDING",
             amount: secondAmount,
-            concept:
-              concept ||
-              `Segundo pago extra ${purpose} para semana ${signedUp.week.number}`,
+            concept: `Segundo pago ${visibleConcept}`,
             dueDate: finalDueDate,
             receiptRequested: receiptRequested ?? false,
             isMandatory: isMandatory ?? true,
@@ -287,13 +308,38 @@ export const createExtraPayment = async (req, res) => {
         });
       }
 
+      if (serviceField) {
+        await tx.signedUp.update({
+          where: {
+            inscriptionId_weekId: {
+              inscriptionId,
+              weekId,
+            },
+          },
+          data: {
+            [serviceField]: true,
+            priceApplied: Number(
+              (Number(signedUp.priceApplied) + finalExtraAmount).toFixed(2)
+            ),
+          },
+        });
+      }
+
       const updatedInscription = await tx.inscription.update({
         where: { id: inscriptionId },
         data: {
-          totalAmountExpected:
-            signedUp.inscription.totalAmountExpected + finalExtraAmount,
-          totalAmountPending:
-            signedUp.inscription.totalAmountPending + finalExtraAmount,
+          totalAmountExpected: Number(
+            (
+              Number(signedUp.inscription.totalAmountExpected) +
+              finalExtraAmount
+            ).toFixed(2)
+          ),
+          totalAmountPending: Number(
+            (
+              Number(signedUp.inscription.totalAmountPending) +
+              finalExtraAmount
+            ).toFixed(2)
+          ),
         },
       });
 

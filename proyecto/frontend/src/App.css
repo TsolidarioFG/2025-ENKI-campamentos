@@ -1035,3 +1035,13 @@ p.field-error-message {
     flex-direction: column;
   }
 }
+
+.food-sensitivity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.food-sensitivity-item {
+  margin: 0;
+}

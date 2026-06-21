@@ -44,17 +44,28 @@ const computeWeekRanges = (startDate, endDate) => {
 export const getSummerCamps = async (req, res) => {
   try {
     const camps = await prisma.summerCamp.findMany({
+  orderBy: {
+    year: "desc",
+  },
+  include: {
+    weeks: {
       orderBy: {
-        year: "desc",
+        number: "asc",
       },
       include: {
-        weeks: {
-          orderBy: {
-            number: "asc",
+        prices: {
+          where: {
+            isActive: true,
           },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
         },
       },
-    });
+    },
+  },
+});
 
     res.json(camps);
   } catch (error) {
@@ -81,18 +92,29 @@ export const getSummerCamp = async (req, res) => {
     }
 
     const camps = await prisma.summerCamp.findMany({
-      where,
+  where,
+  orderBy: {
+    year: "desc",
+  },
+  include: {
+    weeks: {
       orderBy: {
-        year: "desc",
+        number: "asc",
       },
       include: {
-        weeks: {
-          orderBy: {
-            number: "asc",
+        prices: {
+          where: {
+            isActive: true,
           },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
         },
       },
-    });
+    },
+  },
+});
 
     res.json(camps);
   } catch (error) {

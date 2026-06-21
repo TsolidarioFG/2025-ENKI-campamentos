@@ -269,6 +269,33 @@ const getPaymentTypeLabel = (type) => {
   return labels[type] || type;
 };
 
+const getPaymentDisplayLabel = (payment) => {
+  if (payment.paymentType !== "EXTRA") {
+    return getPaymentTypeLabel(payment.paymentType);
+  }
+
+  const purpose = payment.paymentAllocations?.[0]?.purpose;
+
+  const labels = {
+    BREAKFAST: "Desayuno",
+    LUNCH: "Comedor",
+    EARLY_RISE: "Madrugadores",
+    OTHER: "Extra",
+  };
+
+  return labels[purpose] || payment.concept || "Extra";
+};
+const getPaymentMethodLabel = (method) => {
+  const labels = {
+    BANK_TRANSFER: "Transferencia bancaria",
+    CASH: "Efectivo",
+    CARD: "Tarjeta",
+    BIZUM: "Bizum",
+    OTHER: "Otro",
+  };
+
+  return labels[method] || method || "-";
+};
 const getSignedUpStateLabel = (state) => {
   const labels = {
     PENDING: "Pendiente",
@@ -279,7 +306,26 @@ const getSignedUpStateLabel = (state) => {
 
   return labels[state] || state;
 };
+const getGlobalStatusLabel = (status) => {
+  const labels = {
+    PENDING: "Pendiente",
+    ACCEPTED: "Aceptada",
+    WAITLIST: "Lista de espera",
+    CANCELLED: "Cancelada",
+    PARTIALLY_ACCEPTED: "Parcialmente aceptada",
+  };
 
+  return labels[status] || status;
+};
+
+const getPaymentModeLabel = (mode) => {
+  const labels = {
+    ONE_PAYMENT: "Pago único",
+    TWO_PAYMENTS: "Dos pagos",
+  };
+
+  return labels[mode] || mode;
+};
 const mobilityOptions = [
   ["INDEPENDENT", "Independiente"],
   ["NEEDS_SUPERVISION", "Necesita supervisión"],
@@ -296,6 +342,271 @@ const foodSensitivityOptions = [
   ["NONE", "Ninguna"],
   ["OTHER", "Otra"],
 ];
+const formatOption = (labels, value) => {
+  if (value === undefined || value === null || value === "") return "-";
+  return labels[value] || value;
+};
+
+const schoolingTypeLabels = {
+  ORDINARY: "Ordinaria",
+  SPECIAL: "Especial",
+  OTHER: "Otra",
+};
+
+const supportTypeLabels = {
+  NONE: "Sin apoyo",
+  INTERMITTENT: "Intermitente",
+  LIMITED_EXTENSIVE: "Limitado/extenso",
+  GENERALIZED_CONSTANT: "Generalizado/constante",
+};
+
+const autonomyLabels = {
+  INDEPENDENT: "Independiente",
+  NEEDS_SUPERVISION: "Necesita supervisión",
+  NEEDS_PHYSICAL_SUPPORT: "Necesita apoyo físico",
+};
+
+const controlLabels = {
+  GOES_ALONE: "Va solo/a",
+  ASKS_OR_WARNS: "Lo pide o avisa",
+  MUST_BE_ASKED: "Hay que preguntarle",
+  USES_DIAPER: "Usa pañal",
+};
+
+const eatingSupportLabels = {
+  INDEPENDENT: "Independiente",
+  NEEDS_SUPERVISION: "Necesita supervisión",
+  NEEDS_INTERMITTENT_SUPPORT: "Necesita apoyo intermitente",
+  NEEDS_CONTINUOUS_SUPPORT: "Necesita apoyo continuo",
+};
+
+const mobilityLabels = {
+  INDEPENDENT: "Independiente",
+  NEEDS_SUPERVISION: "Necesita supervisión",
+  NEEDS_PHYSICAL_SUPPORT_OR_AID: "Necesita apoyo físico o ayuda técnica",
+};
+
+const oralLanguageLabels = {
+  SOUNDS: "Sonidos",
+  SOME_WORDS: "Algunas palabras",
+  PHRASES: "Frases",
+  FLUENT: "Fluido",
+  DOES_NOT_SPEAK: "No habla",
+};
+
+const imitationLabels = {
+  IMITATES_GESTURES: "Imita gestos",
+  IMITATES_COMPLEX_ACTIONS: "Imita acciones complejas",
+  IMITATES_SOUNDS: "Imita sonidos",
+  IMITATES_WORDS: "Imita palabras",
+  DOES_NOT_IMITATE: "No imita",
+};
+
+const writingLabels = {
+  LETTERS: "Letras",
+  NUMBERS: "Números",
+  WORDS: "Palabras",
+  SENTENCES: "Frases",
+  TEXTS: "Textos",
+};
+
+const comprehensionLabels = {
+  UNDERSTANDS_NO_ONLY: "Entiende solo el no",
+  UNDERSTANDS_SIMPLE_COMMANDS: "Entiende órdenes simples",
+  UNDERSTANDS_COMPLEX_COMMANDS: "Entiende órdenes complejas",
+  NO_COMPREHENSION: "No comprende",
+  OTHER: "Otra",
+};
+
+const readingLabels = {
+  LETTERS: "Letras",
+  NUMBERS: "Números",
+  WORDS: "Palabras",
+  SENTENCES: "Frases",
+  TEXTS: "Textos",
+  DOES_NOT_READ: "No lee",
+  OTHER: "Otra",
+};
+
+const alternativeCommunicationLabels = {
+  NONE: "Ninguna",
+  SIGN_LANGUAGE: "Lengua de signos",
+  PECS: "PECS",
+  COMMUNICATOR: "Comunicador",
+  BRAILLE: "Braille",
+  OTHER: "Otra",
+};
+
+const swimmingLevelLabels = {
+  YES: "Sí sabe nadar",
+  NO: "No sabe nadar",
+  WITH_TECHNICAL_AIDS: "Con ayudas técnicas",
+  WITH_SUPPORT: "Con apoyo",
+};
+
+const socialPlayLabels = {
+  NO_INTEREST_IN_GROUP_PLAY: "No muestra interés por juego en grupo",
+  SMALL_GROUPS: "Grupos pequeños",
+  LARGE_GROUPS: "Grupos grandes",
+};
+
+const playFixationLabels = {
+  SHORT_TIME: "Poco tiempo",
+  LONG_TIME: "Mucho tiempo",
+};
+
+const foodSensitivityLabels = {
+  SOLIDS: "Sólidos",
+  PUREES: "Purés",
+  SOUPS: "Sopas",
+  WATER_JUICES: "Agua o zumos",
+  YOGURTS: "Yogures",
+  FRUIT: "Fruta",
+  NONE: "Ninguna",
+  OTHER: "Otra",
+};
+const isEmptyValue = (value) => {
+  return value === undefined || value === null || value === "";
+};
+const emptyToNull = (value) => {
+  return value === undefined || value === "" ? null : value;
+};
+const cleanObject = (object) => {
+  return Object.fromEntries(
+    Object.entries(object).filter(([, value]) => !isEmptyValue(value))
+  );
+};
+
+const objectHasContent = (object) => {
+  return Object.values(object).some((value) => !isEmptyValue(value));
+};
+
+const cleanArrayByContent = (items = []) => {
+  return items
+    .map((item) => cleanObject(item))
+    .filter((item) => objectHasContent(item));
+};
+
+const buildUpdatePayload = (form) => {
+  const { hasDisability, ...participantWithoutDisabilityFlag } = form.participant;
+
+const payload = {
+  inscription: form.inscription,
+  participant: participantWithoutDisabilityFlag,
+  guardian: form.guardian,
+  address: form.address,
+
+  allergies: cleanArrayByContent(form.allergies),
+  medications: cleanArrayByContent(form.medications),
+  authorizedPeople: cleanArrayByContent(form.authorizedPeople),
+};
+
+  const cleanedSports = cleanArrayByContent(form.sports);
+  const cleanedFears = cleanArrayByContent(form.fears);
+  const cleanedCommunication = cleanArrayByContent(form.communication);
+  const cleanedFoodSensitivities = cleanArrayByContent(form.foodSensitivities);
+
+  const hasExtraFormData =
+    objectHasContent(form.extraForm) ||
+    objectHasContent(form.disability) ||
+    cleanedSports.length > 0 ||
+    cleanedFears.length > 0 ||
+    cleanedCommunication.length > 0 ||
+    cleanedFoodSensitivities.length > 0;
+
+  if (!hasExtraFormData) {
+    return payload;
+  }
+
+  const sport = form.sports?.[0] || {};
+  const fear = form.fears?.[0] || {};
+  const communication = form.communication?.[0] || {};
+
+  payload.extraForm = {
+    calledBefore: form.extraForm.calledBefore,
+    routines: emptyToNull(form.extraForm.routines),
+    emotionalRegulation: emptyToNull(form.extraForm.emotionalRegulation),
+    schoolingType: emptyToNull(form.extraForm.schoolingType),
+    schoolingTypeOther:
+      form.extraForm.schoolingType === "OTHER"
+        ? emptyToNull(form.extraForm.schoolingTypeOther)
+        : null,
+    supportType: emptyToNull(form.extraForm.supportType),
+    hygiene: emptyToNull(form.extraForm.hygiene),
+    bladderControl: emptyToNull(form.extraForm.bladderControl),
+    bowelControl: emptyToNull(form.extraForm.bowelControl),
+    eatingSupport: emptyToNull(form.extraForm.eatingSupport),
+    feedingAdaptation: emptyToNull(form.extraForm.feedingAdaptation),
+    chokingEpisodes: form.extraForm.chokingEpisodes,
+    extraInfo: emptyToNull(form.extraForm.extraInfo),
+  };
+
+  payload.disability = {
+    functionalDiversity: emptyToNull(form.disability.functionalDiversity),
+    disabilityDegree: emptyToNull(form.disability.disabilityDegree),
+    dependencyDegree: emptyToNull(form.disability.dependencyDegree),
+    wheelchair: form.disability.wheelchair,
+    mobilityAid: emptyToNull(form.disability.mobilityAid),
+    walking: emptyToNull(form.disability.walking),
+    running: emptyToNull(form.disability.running),
+    climbing: emptyToNull(form.disability.climbing),
+    crawling: emptyToNull(form.disability.crawling),
+    jumping: emptyToNull(form.disability.jumping),
+    stairs: emptyToNull(form.disability.stairs),
+    outdoorMobility: emptyToNull(form.disability.outdoorMobility),
+  };
+
+  payload.sports = [
+    {
+      doesSport: sport.doesSport,
+      favoriteSports: emptyToNull(sport.favoriteSports),
+      swimmingLevel: emptyToNull(sport.swimmingLevel),
+      socialPlay: emptyToNull(sport.socialPlay),
+      playFixation: emptyToNull(sport.playFixation),
+    },
+  ];
+
+  payload.fears = [
+    {
+      fears: emptyToNull(fear.fears),
+      copingMechanisms: emptyToNull(fear.copingMechanisms),
+    },
+  ];
+
+  payload.communication = [
+    {
+      oralLanguage: emptyToNull(communication.oralLanguage),
+      imitation: emptyToNull(communication.imitation),
+      writing: emptyToNull(communication.writing),
+      comprehension: emptyToNull(communication.comprehension),
+      comprehensionOther:
+        communication.comprehension === "OTHER"
+          ? emptyToNull(communication.comprehensionOther)
+          : null,
+      reading: emptyToNull(communication.reading),
+      readingOther:
+        communication.reading === "OTHER"
+          ? emptyToNull(communication.readingOther)
+          : null,
+      alternativeCommunication: emptyToNull(
+        communication.alternativeCommunication
+      ),
+      alternativeCommunicationOther:
+        communication.alternativeCommunication === "OTHER"
+          ? emptyToNull(communication.alternativeCommunicationOther)
+          : null,
+    },
+  ];
+
+  payload.foodSensitivities = form.foodSensitivities
+    .filter((item) => item.type)
+    .map((item) => ({
+      type: item.type,
+      otherText: item.type === "OTHER" ? emptyToNull(item.otherText) : null,
+    }));
+
+  return payload;
+};
 
 export default function AdminInscriptionDetailPage() {
   const { id } = useParams();
@@ -441,23 +752,34 @@ export default function AdminInscriptionDetailPage() {
   };
 
   const handleSaveDetails = async () => {
-    try {
-      setSavingDetails(true);
-      setError("");
-      setSuccess("");
+      try {
+        setSavingDetails(true);
+        setError("");
+        setSuccess("");
 
-      const result = await updateInscriptionDetails(inscription.id, editForm);
+        const payload = buildUpdatePayload(editForm);
 
-      setInscription(result.inscription);
-      setEditForm(buildEditFormFromInscription(result.inscription));
-      setEditing(false);
-      setSuccess("Datos actualizados correctamente");
-    } catch (error) {
-      setError(error.message || "Error al guardar los cambios");
-    } finally {
-      setSavingDetails(false);
-    }
-  };
+        const result = await updateInscriptionDetails(inscription.id, payload);
+
+        setInscription(result.inscription);
+        setEditForm(buildEditFormFromInscription(result.inscription));
+        setEditing(false);
+        setSuccess("Datos actualizados correctamente");
+      } catch (error) {
+        console.log("STATUS", error.status);
+        console.log("DETAILS", error.details);
+
+        setError(
+          error.details?.length
+            ? error.details
+                .map((item) => `${item.path}: ${item.message}`)
+                .join(" | ")
+            : error.message || "Error al guardar los cambios"
+        );
+      } finally {
+        setSavingDetails(false);
+      }
+    };
 
   const copyExtraFormLink = async () => {
     try {
@@ -646,7 +968,8 @@ export default function AdminInscriptionDetailPage() {
       (extraForm.foodSensitivities?.length ?? 0) > 0)
 );
 
-const shouldShowExtraForm = isEditing || hasExtraFormContent;
+const shouldShowExtraForm =
+  participant?.hasDisability && (isEditing || hasExtraFormContent);
 
   return (
     <section className="detail-section-stack">
@@ -889,7 +1212,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
 
         <div className="detail-grid">
           <DetailItem label="Modalidad de pago">
-            <strong>{inscription.paymentMode}</strong>
+             <strong>{getPaymentModeLabel(inscription.paymentMode)}</strong>
           </DetailItem>
           <DetailItem label="Total esperado">
             <strong>{formatMoney(inscription.totalAmountExpected)}</strong>
@@ -901,7 +1224,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
             <strong>{formatMoney(inscription.totalAmountPending)}</strong>
           </DetailItem>
           <DetailItem label="Estado global">
-            <strong>{inscription.globalStatus}</strong>
+            <strong>{getGlobalStatusLabel(inscription.globalStatus)}</strong>
           </DetailItem>
         </div>
       </Card>
@@ -930,10 +1253,10 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
               {payments.map((payment) => (
                 <tr key={payment.id}>
                   <td>{payment.id}</td>
-                  <td>{getPaymentTypeLabel(payment.paymentType)}</td>
+                  <td>{getPaymentDisplayLabel(payment)}</td>
                   <td>{formatMoney(payment.amount)}</td>
                   <td>{getPaymentStatusLabel(payment.status)}</td>
-                  <td>{payment.method || "-"}</td>
+                  <td>{getPaymentMethodLabel(payment.method)}</td>
                   <td>{payment.concept || "-"}</td>
                   <td>{formatDate(payment.dueDate)}</td>
                   <td>{formatDate(payment.paidAt)}</td>
@@ -981,7 +1304,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
           </DetailItem>
 
           <DetailItem label="Estado global">
-            <strong>{inscription.globalStatus}</strong>
+            <strong>{getGlobalStatusLabel(inscription.globalStatus)}</strong>
           </DetailItem>
 
           <DetailItem label="Modalidad de pago">
@@ -1001,7 +1324,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                 <option value="TWO_PAYMENTS">Dos pagos</option>
               </Select>
             ) : (
-              <strong>{inscription.paymentMode}</strong>
+              <strong>{getPaymentModeLabel(inscription.paymentMode)}</strong>
             )}
           </DetailItem>
 
@@ -1286,27 +1609,8 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
           </DetailItem>
 
           <DetailItem label="Tiene discapacidad">
-            {isEditing ? (
-              <Select
-                id="edit-has-disability"
-                value={booleanSelectValue(
-                  editForm.participant.hasDisability
-                )}
-                onChange={(event) =>
-                  updateEditForm(
-                    "participant",
-                    "hasDisability",
-                    event.target.value === "true"
-                  )
-                }
-              >
-                <option value="true">SI</option>
-                <option value="false">NO</option>
-              </Select>
-            ) : (
-              <strong>{formatBoolean(participant?.hasDisability)}</strong>
-            )}
-          </DetailItem>
+  <strong>{formatBoolean(participant?.hasDisability)}</strong>
+</DetailItem>
         </div>
       </Card>
 
@@ -1570,8 +1874,8 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="SPECIAL">Especial</option>
                     <option value="OTHER">Otra</option>
                   </Select>
-                ) : (
-                  <strong>{formatValue(extraForm?.schoolingType)}</strong>
+                ) : (<strong>{formatOption(schoolingTypeLabels, extraForm?.schoolingType)}</strong>
+                  
                 )}
               </DetailItem>
 
@@ -1617,7 +1921,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     </option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(extraForm?.supportType)}</strong>
+                  <strong>{formatOption(supportTypeLabels, extraForm?.supportType)}</strong>
                 )}
               </DetailItem>
             </div>
@@ -1644,7 +1948,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     </option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(extraForm?.hygiene)}</strong>
+                  <strong>{formatOption(autonomyLabels, extraForm?.hygiene)}</strong>
                 )}
               </DetailItem>
 
@@ -1672,7 +1976,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                       <option value="USES_DIAPER">Usa pañal</option>
                     </Select>
                   ) : (
-                    <strong>{formatValue(extraForm?.[field])}</strong>
+                    <strong>{formatOption(controlLabels, extraForm?.[field])}</strong>
                   )}
                 </DetailItem>
               ))}
@@ -1701,7 +2005,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     </option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(extraForm?.eatingSupport)}</strong>
+                  <strong>{formatOption(eatingSupportLabels, extraForm?.eatingSupport)}</strong>
                 )}
               </DetailItem>
 
@@ -1873,7 +2177,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                       ))}
                     </Select>
                   ) : (
-                    <strong>{formatValue(disability?.[field])}</strong>
+                    <strong>{formatOption(mobilityLabels, disability?.[field])}</strong>
                   )}
                 </DetailItem>
               ))}
@@ -1906,7 +2210,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="DOES_NOT_SPEAK">No habla</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(communication?.oralLanguage)}</strong>
+                  <strong>{formatOption(oralLanguageLabels, communication?.oralLanguage)}</strong>
                 )}
               </DetailItem>
 
@@ -1934,7 +2238,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="DOES_NOT_IMITATE">No imita</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(communication?.imitation)}</strong>
+                  <strong>{formatOption(imitationLabels, communication?.imitation)}</strong>
                 )}
               </DetailItem>
 
@@ -1960,7 +2264,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="TEXTS">Textos</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(communication?.writing)}</strong>
+                  <strong>{formatOption(writingLabels, communication?.writing)}</strong>
                 )}
               </DetailItem>
 
@@ -1992,7 +2296,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="OTHER">Otra</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(communication?.comprehension)}</strong>
+                  <strong>{formatOption(comprehensionLabels, communication?.comprehension)}</strong>
                 )}
               </DetailItem>
 
@@ -2041,7 +2345,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="OTHER">Otra</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(communication?.reading)}</strong>
+                  <strong>{formatOption(readingLabels, communication?.reading)}</strong>
                 )}
               </DetailItem>
 
@@ -2092,8 +2396,11 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                   </Select>
                 ) : (
                   <strong>
-                    {formatValue(communication?.alternativeCommunication)}
-                  </strong>
+  {formatOption(
+    alternativeCommunicationLabels,
+    communication?.alternativeCommunication
+  )}
+</strong>
                 )}
               </DetailItem>
 
@@ -2118,10 +2425,11 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     />
                   ) : (
                     <strong>
-                      {formatValue(
-                        communication?.alternativeCommunicationOther
-                      )}
-                    </strong>
+  {formatOption(
+    alternativeCommunicationLabels,
+    communication?.alternativeCommunication
+  )}
+</strong>
                   )}
                 </DetailItem>
               )}
@@ -2199,7 +2507,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="WITH_SUPPORT">Con apoyo</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(sport?.swimmingLevel)}</strong>
+                  <strong>{formatOption(swimmingLevelLabels, sport?.swimmingLevel)}</strong>
                 )}
               </DetailItem>
 
@@ -2225,7 +2533,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="LARGE_GROUPS">Grupos grandes</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(sport?.socialPlay)}</strong>
+                  <strong>{formatOption(socialPlayLabels, sport?.socialPlay)}</strong>
                 )}
               </DetailItem>
 
@@ -2248,7 +2556,7 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
                     <option value="LONG_TIME">Mucho tiempo</option>
                   </Select>
                 ) : (
-                  <strong>{formatValue(sport?.playFixation)}</strong>
+                  <strong>{formatOption(playFixationLabels, sport?.playFixation)}</strong>
                 )}
               </DetailItem>
 
@@ -2332,14 +2640,14 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
             ) : foodSensitivities.length === 0 ? (
               <p>No constan sensibilidades alimentarias.</p>
             ) : (
-              <ul>
-                {foodSensitivities.map((item) => (
-                  <li key={item.id || item.type}>
-                    {item.type}
-                    {item.otherText ? ` - ${item.otherText}` : ""}
-                  </li>
-                ))}
-              </ul>
+              <div className="food-sensitivity-list">
+  {foodSensitivities.map((item) => (
+    <div key={item.id || item.type} className="food-sensitivity-item">
+      {formatOption(foodSensitivityLabels, item.type)}
+      {item.otherText ? ` - ${item.otherText}` : ""}
+    </div>
+  ))}
+</div>
             )}
           </Card>
 
@@ -2528,11 +2836,13 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
           ) : allergies.length === 0 ? (
             <p>No constan alergias.</p>
           ) : (
-            <ul>
-              {allergies.map((item) => (
-                <li key={item.id}>{item.description}</li>
-              ))}
-            </ul>
+            <div className="plain-list">
+  {allergies.map((item) => (
+    <div key={item.id} className="plain-list-item">
+      {item.description}
+    </div>
+  ))}
+</div>
           )}
         </Card>
 
@@ -2584,11 +2894,13 @@ const shouldShowExtraForm = isEditing || hasExtraFormContent;
           ) : medications.length === 0 ? (
             <p>No consta medicación.</p>
           ) : (
-            <ul>
-              {medications.map((item) => (
-                <li key={item.id}>{item.description}</li>
-              ))}
-            </ul>
+            <div className="plain-list">
+  {medications.map((item) => (
+    <div key={item.id} className="plain-list-item">
+      {item.description}
+    </div>
+  ))}
+</div>
           )}
         </Card>
       </div>

@@ -5,7 +5,7 @@ export const getWeeks = ({ summerCampId }) => {
 };
 
 export const updateWeek = ({ summerCampId, number, payload }) => {
-  return apiClient(`/weeks/${summerCampId}/${number}`, {
+  return apiClient(`/weeks/summercamp/${summerCampId}/week/${number}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
@@ -19,7 +19,7 @@ export const createWeek = (payload) => {
 };
 
 export const deleteWeek = ({ summerCampId, number }) => {
-  return apiClient(`/weeks/${summerCampId}/${number}`, {
+  return apiClient(`/weeks/summercamp/${summerCampId}/week/${number}`, {
     method: "DELETE",
   });
 };
