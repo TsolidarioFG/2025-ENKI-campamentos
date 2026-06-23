@@ -24,7 +24,17 @@ const getWeekLabel = (signedUp) => {
 
   return `Semana ${week.number}`;
 };
+const getGlobalStatusLabel = (status) => {
+  const labels = {
+    PENDING: "Pendiente",
+    ACCEPTED: "Aceptada",
+    WAITLIST: "Lista de espera",
+    CANCELLED: "Cancelada",
+    PARTIALLY_ACCEPTED: "Parcialmente aceptada",
+  };
 
+  return labels[status] || status || "-";
+};
 export default function InscriptionConfirmationPage() {
   const location = useLocation();
   const { year } = useParams();
