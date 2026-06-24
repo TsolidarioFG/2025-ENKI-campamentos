@@ -1,8 +1,8 @@
-````markdown
+
 # ENKI Camp Registration Management Application
 
 <p align="center">
-  <img src="docs/assets/enki-logo.png" alt="ENKI logo" width="180"/>
+  <img src="docs/assets/MARCA ENKI NEGRO.png" alt="ENKI logo" width="180"/>
 </p>
 
 <p align="center">
@@ -47,12 +47,7 @@ This application provides a tailored web system adapted to ENKI's registration w
 
 ![Inscription detail](docs/screenshots/inscription-detail.png)
 
-### Camp week management
 
-![Camp week management](docs/screenshots/week-management.png)
-
-> The images above should be stored in `docs/screenshots/`.  
-> The ENKI logo should be stored in `docs/assets/enki-logo.png`.
 
 ---
 
@@ -346,4 +341,4 @@ Final Degree Project
 University of A Coruña
 
 ```
-```
+
